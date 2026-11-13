@@ -29,8 +29,13 @@ function keepViewportRender(){render();}
 async function run(action,{success='عملیات ثبت شد.'}={}){
  if(state.busy)return;
  state.busy=true;app.classList.add('app-busy');
- try{await action();await refresh(true);if(success)notify(success);}
- catch(err){if(!err.status)updateConnection('offline');notify(err.message,true);if(err.status===401){state.me=null;state.data=null;render();}else if(err.status===409){await refresh(true).catch(()=>{});}}
+ let actionSucceeded=false;
+ try{await action();actionSucceeded=true;await refresh(true);if(success)notify(success);}
+ catch(err){
+  if(!err.status)updateConnection('offline');
+  if(actionSucceeded){notify('عملیات روی سرور انجام شد، اما دریافت وضعیت جدید ممکن نشد. پس از اتصال، اطلاعات را دوباره بررسی کنید.',true);}
+  else {notify(err.message,true);if(err.status===401){state.me=null;state.data=null;render();}else if(err.status===409){await refresh(true).catch(()=>{});}}
+ }
  finally{state.busy=false;app.classList.remove('app-busy');}
 }
 async function refresh(force=false){if(!state.me)return;if(!force&&document.hidden)return;const previous=JSON.stringify(state.data);let data;try{data=await api('/api/shift');updateConnection('ok');}catch(err){updateConnection('offline');throw err;}state.data=data;state.lastUpdate=new Date();if(!state.branchId||!data.branches.some(b=>b.id===state.branchId)){const busyBranch=data.branches.find(b=>data.sessions.some(session=>!session.closed_at&&session.branch_id===b.id));state.branchId=busyBranch?.id??data.branches[0]?.id??null;}if(!state.tableId||!data.tables.some(t=>t.id===state.tableId&&t.branch_id===state.branchId))state.tableId=currentTables()[0]?.id??null;if(!state.cashTableId||!data.tables.some(t=>t.id===state.cashTableId&&t.branch_id===state.branchId))state.cashTableId=currentTables().find(t=>sessionFor(t.id))?.id??currentTables()[0]?.id??null;if(force||previous!==JSON.stringify(data)){if(!force&&(document.activeElement?.matches('input,textarea,select')||document.querySelector('#action-dialog[open]'))){state.pendingRefresh=true;return;}state.pendingRefresh=false;keepViewportRender();}}
