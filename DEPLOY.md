@@ -27,3 +27,16 @@ For a trusted OpenAI-compatible API set `AI_API_URL` (HTTPS full chat-completion
 - Default application session and local seed policies need production hardening, including staff provisioning and rate limiting.
 - The current app uses polling, not WebSocket push, and does not implement offline durability.
 - Release should be gated on passing database integration CI and a manual multi-device walkthrough.
+
+## Railway deployment (November 2026, **requires connected hosting account**)
+
+Railway's current configuration model is Infrastructure as Code (`.railway/railway.ts`) or the live project dashboard; **do not create a new `railway.json`** because Railway now deprecates Config as Code and disallows it for new services. Official: https://docs.railway.com/infrastructure-as-code and https://docs.railway.com/databases/postgresql.
+
+1. In the Railway account, create a project, add a PostgreSQL service (private networking only) and connect the GitHub repo `afakhari/restaurant-father` to a Node web service using the committed Dockerfile. **This step cannot be performed unless the Railway account is connected and can incur hosting charges.**
+2. Run `npm run migrate` in a **separate one-off migration context** with the admin connection string (`ADMIN_DATABASE_URL`) and freshly generated `DB_APP_PASSWORD`; this role must have `CREATEROLE` or sufficient privileges to create `restaurant_runtime`. If a managed host denies role creation, this deployment procedure needs an operator-admin bootstrap rather than silently switching the HTTP runtime to a privileged connection. Do not save the admin secret in the live Node process.
+3. For a **demo-only** database, run the seed script once from the separate migration context with `SEED_DEMO=true` and a fresh private `DEMO_PASSWORD`. Never enable demo seeding against customer data.
+4. In the actual app service, set a `DATABASE_URL` with username `restaurant_runtime` and the runtime-only password, `NODE_ENV=production`, `COOKIE_SECURE=true`, actual public `PUBLIC_ORIGIN=https://<generated-domain>`, and `PORT` (Railway provides it). The runtime must never receive `ADMIN_DATABASE_URL`.
+5. Set health path `/api/health`, generate a Railway public domain and check valid HTTPS. Copy that **actual** domain into the ATS sheet, run browser smoke tests with authentic seeded demo credentials, and optionally set `AI_API_URL`, `AI_API_KEY`, `AI_MODEL`. Keep secrets in Railway variables.
+6. Test whether the login demo shortcuts **do not publish the local Docker password** on the public hostname and confirm that correct private seeded login works. Run RLS/cross-tenant and two-client concurrency tests.
+
+The authoring environment has no connected Railway account or hosting credentials. None of these remote resources has been created, and no web URL is claimed.

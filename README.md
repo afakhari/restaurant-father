@@ -2,7 +2,7 @@
 
 **A narrow, operational MVP for Iranian café and restaurant shifts.** It connects waiter order entry, kitchen preparation, waiter handoff, and cashier settlement across multiple rounds on the same table. The emphasis is on *not losing work when several staff act at the same time*, rather than building every part of an ERP.
 
-> **Submission status:** a working code implementation with Docker Compose, migrations, demo seed, role-restricted HTTP API, RTL web UI, optional LLM capability, and tests. **There is no verified public deployment URL or recorded video yet.** See [DEPLOY.md](DEPLOY.md). Do not confuse a GitHub repository with a running restaurant service.
+> **Submission status:** a working code implementation with Docker Compose, migrations, demo seed, role-restricted HTTP API, RTL web UI, optional LLM capability, and tests. **There is no verified public deployment URL or candidate-recorded 5–10 minute video yet.** See [DEPLOY.md](DEPLOY.md). Do not confuse a GitHub repository with a running restaurant service.
 
 ## Quick start: one command
 
@@ -129,3 +129,9 @@ Read [DEPLOY.md](DEPLOY.md) before putting this behind HTTPS. Do not deploy with
 - [DEPLOY.md](DEPLOY.md): HTTPS and environment checklist
 
 Licensed under the repository's existing MIT LICENSE.
+
+## Browser UX evidence (real app, automated)
+
+On pull requests affecting the actual UI, the [Browser UX workflow](.github/workflows/browser-evidence.yml) starts a real PostgreSQL 16 instance and Node HTTP application, then uses Chromium/Playwright to exercise the flow via **actual employee screens**, saving screenshots and an automatic browser video to the GitHub Actions artifact `real-app-browser-evidence`. It covers waiter (two rounds on table 8), kitchen start/ready, waiter served, cashier discount and checkout, independent tenant and a 390px mobile viewport. The video is **automated acceptance evidence, not the recorded candidate explanation** requested by Abrnac.
+
+For the ATS final form and exact prompt disclosure, see [ATS_SUBMISSION.md](ATS_SUBMISSION.md) and [AI_PROMPTS.md](AI_PROMPTS.md). Do not submit without a verified live site, credentials, and narrated walkthrough.

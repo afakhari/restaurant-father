@@ -1,0 +1,76 @@
+name: Browser UX walkthrough and evidence
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/browser-smoke.mjs'
+      - '.github/workflows/browser-evidence.yml'
+      - 'db/**'
+      - 'scripts/migrate.mjs'
+      - 'scripts/seed.mjs'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'scripts/browser-smoke.mjs'
+      - '.github/workflows/browser-evidence.yml'
+      - 'db/**'
+      - 'scripts/migrate.mjs'
+      - 'scripts/seed.mjs'
+permissions:
+  contents: read
+jobs:
+  chromium-shift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-admin-password
+          POSTGRES_DB: shiftyar
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shiftyar"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ADMIN_DATABASE_URL: postgres://postgres:test-only-admin-password@127.0.0.1:5432/shiftyar
+      DB_APP_PASSWORD: test-only-runtime-password
+      DATABASE_URL: postgres://restaurant_runtime:test-only-runtime-password@127.0.0.1:5432/shiftyar
+      DEMO_PASSWORD: Demo-Shift-1405!
+      SEED_DEMO: 'true'
+      COOKIE_SECURE: 'false'
+      PUBLIC_ORIGIN: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install app and Playwright
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund playwright@1.55.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - run: npm run migrate
+      - run: npm run seed
+      - name: Start actual Node API and Persian UI
+        run: |
+          node src/server.mjs > /tmp/shiftyar-browser.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3000/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:3000/api/health
+      - name: Exercise full browser workflow
+        run: node scripts/browser-smoke.mjs
+      - name: Upload screenshots and unscripted browser video
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-app-browser-evidence
+          path: artifacts/browser-evidence/
+          retention-days: 7
+      - name: Log excerpt on failure
+        if: failure()
+        run: tail -80 /tmp/shiftyar-browser.log || true
