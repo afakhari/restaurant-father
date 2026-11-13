@@ -1,0 +1,29 @@
+# Deployment and HTTPS checklist
+
+**Status:** GitHub repository and Docker Compose recipe prepared. **No live HTTPS deployment has been completed or verified by the authoring environment.** A public URL cannot be invented; neither can credentials for an unprovisioned host.
+
+## Local reproducible environment
+
+Run `docker compose up --build`. The migration container uses `ADMIN_DATABASE_URL`; the running app uses `DATABASE_URL` for the restricted `restaurant_runtime` role. The demo seeder is explicitly enabled only in the local compose recipe.
+
+## Recommended hosted deployment (operator steps)
+
+1. Provision a Linux host or managed container platform and **managed PostgreSQL 16** with backups. Place both behind a private network; never expose port 5432 publicly.
+2. Generate unique strong `DB_ADMIN_PASSWORD`, `DB_APP_PASSWORD`, admin and app connection strings. Restrict the migrator's DB owner credential to deployment only. Never give it to the HTTP runtime.
+3. Apply migration with `ADMIN_DATABASE_URL=... DB_APP_PASSWORD=... npm run migrate`. Do **not** run `SEED_DEMO=true` against real customer data. Create legitimate staff accounts with controlled onboarding before production use.
+4. Run `node src/server.mjs` with `DATABASE_URL`, `NODE_ENV=production`, `COOKIE_SECURE=true`, `PUBLIC_ORIGIN=https://your-domain.example`, `PORT=3000` and optional AI environment variables. Keep secrets in host secret management, not GitHub files.
+5. Put **Caddy / Nginx / a platform TLS proxy** in front of the HTTP process and install a valid certificate. Redirect HTTP to HTTPS, configure HSTS after verifying HTTPS and restrict proxy request size.
+6. Verify `/api/health`, same-origin login/logout, branch switching, a complete order→kitchen→serve→cashier flow, cross-tenant tests, mobile layouts, network interruptions and load on the target infrastructure.
+7. Configure database backups/restore drills, request/DB error alerting, rate limits (especially login), role/account lifecycle and operational incident response. Record actual demo URL and one-time demo credentials only after the host is ready.
+
+## AI endpoint
+
+For a trusted OpenAI-compatible API set `AI_API_URL` (HTTPS full chat-completions URL), `AI_API_KEY`, `AI_MODEL`, optional `AI_TIMEOUT_MS`. Do not expose the key in frontend code. Limit billing/rate externally and test Persian menu ambiguity. AI remains disabled if settings are absent.
+
+## Important caveats
+
+- `compose.yaml` includes **local demo credentials** and must not be deployed unchanged on the public internet.
+- No bank/payment gateway is integrated. The `checkout` endpoint records cashier attestation of an outside payment only.
+- Default application session and local seed policies need production hardening, including staff provisioning and rate limiting.
+- The current app uses polling, not WebSocket push, and does not implement offline durability.
+- Release should be gated on passing database integration CI and a manual multi-device walkthrough.

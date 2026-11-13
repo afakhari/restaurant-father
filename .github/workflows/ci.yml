@@ -1,0 +1,41 @@
+name: Verify product workflow
+on:
+  push:
+    branches: [main, feat/shift-yar-service-mvp]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  unit-and-shift:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-admin-password
+          POSTGRES_DB: shiftyar
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shiftyar"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ADMIN_DATABASE_URL: postgres://postgres:test-only-admin-password@127.0.0.1:5432/shiftyar
+      DB_APP_PASSWORD: test-only-runtime-password
+      DATABASE_URL: postgres://restaurant_runtime:test-only-runtime-password@127.0.0.1:5432/shiftyar
+      DEMO_PASSWORD: Demo-Shift-1405!
+      SEED_DEMO: 'true'
+      COOKIE_SECURE: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run check
+      - run: npm test
+      - run: npm run migrate
+      - run: npm run seed
+      - run: npm run test:integration
