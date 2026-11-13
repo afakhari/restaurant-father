@@ -44,3 +44,22 @@
 ## UI-specific safeguards
 
 The current interface asks for explicit confirmation before deleting an unsubmitted order draft or attesting a received payment; these are **error-prevention UX measures, not server authorization**. The server independently validates roles, snapshot price, session version and settlement eligibility. The optional AI-enabled flag exposes only whether configuration exists, never a provider key. The in-memory draft does not survive a browser crash, and the connection indicator is not an offline durable queue. See the separate UX audit for responsive and accessibility boundaries.
+
+
+## 4. Least-privilege data visibility inside one restaurant
+
+**Threat:** A kitchen worker has valid login credentials and reads `/api/shift` directly to obtain cashier payment history, item prices, discounts or manager audit events, despite not seeing those screens.
+
+**Controls:** The server projects its snapshot by authenticated role. Kitchen receives active tickets, table context, names and notes but no amount/payment fields or event history; waiter sees only active sessions, not paid receipts or manager audit; cashier sees billing data without a full menu feed. Manager retains all operational context.
+
+**Evidence:** Integration tests assert absent JSON fields by role and verify that permitted ticket operations still work after projection.
+
+**Residual:** Restaurant-level memberships still allow workers to switch between branches. The single endpoint loads more data than necessary before projecting; split read endpoints and branch-scoped memberships are longer-term hardening.
+
+## 5. Cancellation/void integrity
+
+A fully cancelled table is closed only by a manager and only with a logged reason, under the same transaction/advisory lock and `expectedVersion` as checkout. It creates no `paid_at`, `paid_amount_toman` or `payment_method`. A kitchen worker cannot cancel a started dish, and a cashier cannot void a table. No refund is implied for an already served dish.
+
+**Idempotency content integrity:** replay keys must match the same table **and** an equivalent set of item IDs, quantities and separate preparation notes. Reusing a key with edited contents returns HTTP 409 rather than pretending that the edited order was saved. Concurrency tests cover changed quantities and notes.
+
+**Contract compatibility:** active-session response projections retain a nonsensitive `version` counter for waiter and kitchen actions, so clients can detect stale operations without revealing payment fields.

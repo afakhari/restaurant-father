@@ -1,23 +1,29 @@
 import {randomUUID} from 'node:crypto';
-import {HttpError,requireInt,requireUuid,requiredRole,nextItemStatus,parseRound,paymentMethods,sumSubtotal,canCheckout} from './core.mjs';
+import {HttpError,requireInt,requireUuid,requiredRole,nextItemStatus,parseRound,paymentMethods,sumSubtotal,canCheckout,canVoidSession} from './core.mjs';
 import {withTenant,requireSession,lockTable,getSessionItems,logEvent} from './db.mjs';
+
+// Idempotency is a *request* identity, not a license to silently accept edited
+// contents. A replay must match the same table AND every individual item/note.
+async function verifiedRoundReplay(client,row,body){
+ if(row.table_id!==body.tableId)throw new HttpError(409,'IDEMPOTENCY_CONFLICT','این شناسه سفارش قبلاً برای میز دیگری استفاده شده است.');
+ const result=await client.query('SELECT menu_item_id,quantity,note FROM order_items WHERE round_id=$1',[row.id]);
+ const normalize=items=>items.map(x=>JSON.stringify([x.menuItemId??x.menu_item_id,Number(x.quantity),String(x.note??'').trim()])).sort();
+ if(JSON.stringify(normalize(result.rows))!==JSON.stringify(normalize(body.items))){
+  throw new HttpError(409,'IDEMPOTENCY_CONFLICT','این درخواست قبلاً با اقلام یا توضیحات متفاوت ثبت شده است. سفارش جاری را بررسی کنید و درخواست تازه‌ای ثبت کنید.');
+ }
+ return {roundId:row.id,sessionId:row.session_id,replayed:true};
+}
 
 export async function addRound(user,raw){
  requiredRole(user,['waiter','manager']);const body=parseRound(raw);
  return withTenant(user,async client=>{
    // Same key already completed: returning it is safe even if the table was checked out since.
    let previous=await client.query('SELECT r.id,r.session_id,s.table_id FROM order_rounds r JOIN table_sessions s ON s.id=r.session_id WHERE r.created_by=$1 AND r.idempotency_key=$2',[user.id,body.idempotencyKey]);
-   if(previous.rowCount){
-     if(previous.rows[0].table_id!==body.tableId)throw new HttpError(409,'IDEMPOTENCY_CONFLICT','کلید این درخواست قبلاً برای میز دیگری استفاده شده است.');
-     return {roundId:previous.rows[0].id,sessionId:previous.rows[0].session_id,replayed:true};
-   }
+   if(previous.rowCount)return verifiedRoundReplay(client,previous.rows[0],body);
    const table=await lockTable(client,body.tableId);
    // Recheck after serializing on the table to handle simultaneous retries of the same key.
    previous=await client.query('SELECT r.id,r.session_id,s.table_id FROM order_rounds r JOIN table_sessions s ON s.id=r.session_id WHERE r.created_by=$1 AND r.idempotency_key=$2',[user.id,body.idempotencyKey]);
-   if(previous.rowCount){
-     if(previous.rows[0].table_id!==table.id)throw new HttpError(409,'IDEMPOTENCY_CONFLICT','کلید این درخواست قبلاً برای میز دیگری استفاده شده است.');
-     return {roundId:previous.rows[0].id,sessionId:previous.rows[0].session_id,replayed:true};
-   }
+   if(previous.rowCount)return verifiedRoundReplay(client,previous.rows[0],body);
    const existing=await client.query('SELECT id FROM table_sessions WHERE table_id=$1 AND closed_at IS NULL FOR UPDATE',[table.id]);
    const sessionId=existing.rows[0]?.id??null;
    if(body.expectedSessionId!==sessionId)throw new HttpError(409,'STALE_SESSION','وضعیت میز تغییر کرده است. صفحه را تازه کنید.');
@@ -88,5 +94,25 @@ export async function checkout(user,sessionId,body){
   await client.query('UPDATE table_sessions SET closed_at=now(),paid_at=now(),payment_method=$2,paid_amount_toman=$3,version=version+1 WHERE id=$1',[sessionId,body.method,total]);
   await logEvent(client,user,sessionId,'session.checked_out',{subtotal,discount:s.discount_toman,total,method:body.method});
   return {sessionId,total,method:body.method};
+ });
+}
+
+// Closing an entirely cancelled table must not masquerade as a paid bill.
+// A manager alone may release it, with an auditable reason and version check.
+export async function voidSession(user,sessionId,body){
+ requiredRole(user,['manager']);requireUuid(sessionId,'نشست');
+ const expected=requireInt(body?.expectedVersion,1,1000000000,'نسخه');
+ const reason=body?.reason;
+ if(typeof reason!=='string'||reason.trim().length<3||reason.length>200)throw new HttpError(400,'VALIDATION','دلیل بستن میز لغوشده باید بین ۳ تا ۲۰۰ کاراکتر باشد.');
+ return withTenant(user,async client=>{
+  const s0=await requireSession(client,sessionId);await lockTable(client,s0.table_id);
+  const s=await requireSession(client,sessionId,{lock:true});
+  if(s.closed_at)throw new HttpError(409,'CLOSED','این میز قبلاً بسته شده است.');
+  if(s.version!==expected)throw new HttpError(409,'STALE_VERSION','وضعیت میز تغییر کرده است. دوباره بررسی کنید.');
+  const items=await getSessionItems(client,sessionId);
+  if(!canVoidSession(items))throw new HttpError(409,'NOT_ALL_CANCELLED','بستن بدون دریافت وجه فقط زمانی مجاز است که همه اقلام لغو شده باشند.');
+  await client.query('UPDATE table_sessions SET closed_at=now(),version=version+1 WHERE id=$1',[sessionId]);
+  await logEvent(client,user,sessionId,'session.voided',{reason:reason.trim(),cancelledLines:items.length});
+  return {sessionId,voided:true};
  });
 }

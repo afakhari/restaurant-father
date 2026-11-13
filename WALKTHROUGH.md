@@ -24,3 +24,5 @@ If the `Browser UX walkthrough and evidence` CI workflow passes, download its `r
 ## Updated interaction sequence for recording
 
 On a **phone**, demonstrate the three ordering steps (table → menu → order), the sticky draft summary, note editing, and the confirmation warning when changing tables with an unsubmitted draft. Show a cashier checkout confirmation in the application's own dialog. State clearly that the "connection status" label reflects the last server snapshot and is not a durable offline order queue. The latest UX acceptance matrix and limits are in [docs/UX_AUDIT.fa.md](docs/UX_AUDIT.fa.md).
+
+در نمای مدیر، نشان دهید که **بستن میز کاملاً لغوشده** پرداخت صفرِ ساختگی تولید نمی‌کند؛ علت ثبت می‌شود و صندوق‌دار این مجوز را ندارد. در صندوق، تخفیف «۵۰٬۰۰۰» با رقم فارسی و در سالن، «تفکیک قلم» برای دو نوشیدنی متفاوت را می‌توان به‌عنوان دو مثال مشخص از بومی‌سازی نشان داد.

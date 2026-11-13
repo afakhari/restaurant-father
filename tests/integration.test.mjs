@@ -56,6 +56,11 @@ test('parallel round additions survive, retries are idempotent, tenant cannot al
  assert.equal(a.status,201);assert.equal(b.status,201);assert.notEqual(a.body.roundId,b.body.roundId);
  const replay=await request('waiter','POST','/api/rounds',payloadA);
  assert.equal(replay.status,201);assert.equal(replay.body.replayed,true);assert.equal(replay.body.roundId,a.body.roundId);
+ const editedQuantity=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],quantity:2}]});
+ assert.equal(editedQuantity.status,409,'same retry key with changed quantity cannot claim a successful save');
+ assert.equal(editedQuantity.body.error.code,'IDEMPOTENCY_CONFLICT');
+ const editedNote=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],note:'بدون یخ'}]});
+ assert.equal(editedNote.status,409,'same retry key with changed note cannot lose a preparation instruction');
  // Reusing the same idempotency key on a different table must NOT silently return the old round.
  const otherTable=A.tables.find(x=>x.id!==t.id);
  const wrongTable=await request('waiter','POST','/api/rounds',{...payloadA,tableId:otherTable.id,expectedSessionId:null});
@@ -92,7 +97,9 @@ test('complete user workflow: waiter -> kitchen -> waiter serves -> cashier disc
  const paid=await request('cashier','POST',`/api/sessions/${session.id}/checkout`,{method:'pos',expectedVersion:session.version});
  assert.equal(paid.status,200);assert.equal(paid.body.total,menu.price_toman*2-10000);
  snap=(await shift('waiter')).body;assert.ok(!sessionFor(snap,t.id));
- assert.ok(snap.events.some(x=>x.session_id===session.id&&x.event_type==='session.checked_out'));
+ const managerSnapshot=(await shift('manager')).body;
+ assert.ok(managerSnapshot.events.some(x=>x.session_id===session.id&&x.event_type==='session.checked_out'));
+ assert.equal(snap.events.length,0,'waiter may not receive manager audit events');
 });
 
 test('CSRF origin mismatch fails closed',async()=>{
@@ -165,4 +172,53 @@ test('busy historical traffic never removes an older open table from the live sh
  assert.ok(after.rounds.some(x=>x.session_id===active.id),'active rounds must remain loaded');
  assert.ok(after.items.some(x=>after.rounds.some(r=>r.session_id===active.id&&r.id===x.round_id)),'active order items must remain loaded');
  assert.ok(after.sessions.filter(x=>x.closed_at).length<=20,'closed history must be bounded independently');
+});
+
+
+test('role-specific shift responses never expose checkout money to kitchen or manager audits to staff',async()=>{
+ const kitchen=(await shift('kitchen')).body,waiter=(await shift('waiter')).body,cashier=(await shift('cashier')).body,manager=(await shift('manager')).body;
+ assert.ok(kitchen.sessions.length,'kitchen must still receive the active shift');
+ assert.ok(kitchen.items.length,'kitchen needs ticket detail');
+ assert.ok(!('unit_price_toman' in kitchen.items[0]),'kitchen should not receive item prices');
+ assert.ok(!('discount_toman' in kitchen.sessions[0]),'kitchen should not receive discounts');
+ assert.ok(!('payment_method' in kitchen.sessions[0]),'kitchen should not receive payment details');
+ assert.ok(!('price_toman' in kitchen.menu[0]),'kitchen needs dish category, not prices');
+ assert.deepEqual(kitchen.events,[]);
+ assert.deepEqual(waiter.events,[]);
+ assert.ok(waiter.sessions.every(s=>!s.closed_at),'waiter should not receive past closed receipts');
+ assert.ok(!('paid_amount_toman' in waiter.sessions[0]));
+ assert.deepEqual(cashier.menu,[],'cashier does not need full menu feed');
+ assert.deepEqual(cashier.events,[],'cashier should not receive manager audit');
+ assert.ok(manager.events.length>0,'manager retains audit visibility');
+ assert.ok(manager.items.some(i=>typeof i.unit_price_toman==='number'),'manager retains price visibility');
+});
+
+test('manager can resolve stockout, but only fully cancelled tables can be voided without fake payment',async()=>{
+ const snap=(await shift('waiter')).body;
+ const t=snap.tables.find(t=>t.number===7&&!sessionFor(snap,t.id));assert.ok(t,'seed table 7 should be free');
+ const dishes=snap.menu.filter(m=>m.available).slice(0,3);assert.equal(dishes.length,3);
+ const created=await request('waiter','POST','/api/rounds',{tableId:t.id,expectedSessionId:null,idempotencyKey:crypto.randomUUID(),items:dishes.map((dish,i)=>({menuItemId:dish.id,quantity:1,note:i===1?'بدون پیاز':''}))});
+ assert.equal(created.status,201);
+ let cur=(await shift('manager')).body,session=sessionFor(cur,t.id),items=itemsFor(cur,session.id);assert.equal(items.length,3);
+ assert.equal((await request('cashier','POST',`/api/sessions/${session.id}/void`,{expectedVersion:session.version,reason:'سفارش لغو شد'})).status,403);
+ assert.equal((await request('manager','POST',`/api/sessions/${session.id}/void`,{expectedVersion:session.version,reason:'سفارش لغو شد'})).status,409);
+ const first=items[0],second=items[1],third=items[2];
+ assert.equal((await request('kitchen','POST',`/api/items/${second.id}/transition`,{to:'preparing',expectedStatus:'queued'})).status,200);
+ assert.equal((await request('kitchen','POST',`/api/items/${third.id}/transition`,{to:'preparing',expectedStatus:'queued'})).status,200);
+ assert.equal((await request('kitchen','POST',`/api/items/${third.id}/transition`,{to:'ready',expectedStatus:'preparing'})).status,200);
+ assert.equal((await request('waiter','POST',`/api/items/${second.id}/transition`,{to:'cancelled',expectedStatus:'preparing',reason:'ناموجود'})).status,403);
+ assert.equal((await request('kitchen','POST',`/api/items/${third.id}/transition`,{to:'cancelled',expectedStatus:'ready',reason:'کیفیت پایین'})).status,403);
+ assert.equal((await request('manager','POST',`/api/items/${first.id}/transition`,{to:'cancelled',expectedStatus:'queued',reason:'مشتری انصراف داد'})).status,200);
+ assert.equal((await request('manager','POST',`/api/items/${second.id}/transition`,{to:'cancelled',expectedStatus:'preparing',reason:'ماده اولیه تمام شد'})).status,200);
+ assert.equal((await request('manager','POST',`/api/items/${third.id}/transition`,{to:'cancelled',expectedStatus:'ready',reason:'اشکال کیفیت'})).status,200);
+ cur=(await shift('manager')).body;session=sessionFor(cur,t.id);
+ assert.equal((await request('manager','POST',`/api/sessions/${session.id}/checkout`,{expectedVersion:session.version,method:'pos'})).status,409,'all cancelled is not a paid receipt');
+ assert.equal((await request('manager','POST',`/api/sessions/${session.id}/void`,{expectedVersion:session.version,reason:' ' })).status,400);
+ assert.equal((await request('manager','POST',`/api/sessions/${session.id}/void`,{expectedVersion:session.version-1,reason:'همه اقلام لغو شده' })).status,409);
+ const done=await request('manager','POST',`/api/sessions/${session.id}/void`,{expectedVersion:session.version,reason:'همه اقلام لغو شده‌اند'});
+ assert.equal(done.status,200);assert.equal(done.body.voided,true);
+ cur=(await shift('manager')).body;assert.ok(!sessionFor(cur,t.id));
+ const closed=cur.sessions.find(x=>x.id===session.id);assert.ok(closed.closed_at);assert.equal(closed.paid_amount_toman,null);assert.equal(closed.payment_method,null);
+ assert.ok(cur.events.some(x=>x.event_type==='session.voided'&&x.session_id===session.id));
+ assert.equal((await request('manager','POST',`/api/sessions/${session.id}/void`,{expectedVersion:closed.version,reason:'تکراری'})).status,409);
 });

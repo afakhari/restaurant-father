@@ -21,7 +21,7 @@ export function parseRound(body) {
   return {tableId,expectedSessionId,idempotencyKey,items};
 }
 export function nextItemStatus(current,to,role,reason=''){
-  const map={queued:{preparing:['kitchen','manager'],cancelled:['waiter','manager']},preparing:{ready:['kitchen','manager']},ready:{served:['waiter','manager']}};
+  const map={queued:{preparing:['kitchen','manager'],cancelled:['waiter','manager']},preparing:{ready:['kitchen','manager'],cancelled:['manager']},ready:{served:['waiter','manager'],cancelled:['manager']}};
   if(!map[current]?.[to])throw new HttpError(409,'INVALID_TRANSITION','تغییر وضعیت در این مرحله مجاز نیست.');
   if(!map[current][to].includes(role))throw new HttpError(403,'FORBIDDEN','تغییر وضعیت برای نقش شما مجاز نیست.');
   if(to==='cancelled'&&(typeof reason!=='string'||reason.trim().length<3||reason.length>200))throw new HttpError(400,'VALIDATION','برای لغو، دلیل روشن و کوتاه ثبت کنید.');
@@ -29,6 +29,7 @@ export function nextItemStatus(current,to,role,reason=''){
 }
 export function sumSubtotal(items){return items.filter(x=>x.status!=='cancelled').reduce((sum,x)=>sum + Number(x.quantity)*Number(x.unit_price_toman),0);}
 export function canCheckout(items){return items.length>0&&items.every(x=>['served','cancelled'].includes(x.status))&&items.some(x=>x.status==='served');}
+export function canVoidSession(items){return items.length>0&&items.every(x=>x.status==='cancelled');}
 export function normalizeAIResult(payload,menu){
   if(!payload||!Array.isArray(payload.items))throw new HttpError(502,'AI_INVALID','پاسخ دستیار قابل استفاده نیست.');
   const allowed=new Set(menu.filter(x=>x.available).map(x=>x.id));

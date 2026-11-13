@@ -32,3 +32,10 @@ The current restaurant's menu ID/name list is supplied as another **system** mes
 ## Important distinction for an evaluator
 
 ChatGPT/GPT-6 performed a substantial proportion of coding and documentation, under the user's instructions. The submitted assessment is not presented as an unaided handwritten implementation. This is also recorded in [AI_USAGE.md](AI_USAGE.md). Do not claim independent human review, a hosted website, paid AI inference, or a human-recorded walkthrough where those are unverified.
+
+
+## Latest user-directed review requests (verbatim)
+
+- «حواست باشه محصول باید از همه نظر مناسب فارسی و ایران باشه. لغزش گاه ها و سناریو های مختلف رو بررسی کن و مطمئن شو همه چیز کامل است و هر کاربر همان چیزی که باید را به بهترین شکل می بیند و همه ی امکانات لازم را در اختیار دارد. اقدامات لازم را انجام بده به طور کامل و مطمئن شو همه چیز کامل و بدون نقص است»
+
+The review led to localized input validation, role-scoped read responses, and manager-only exception paths. The reviewer should not interpret this instruction as evidence that every possible edge case has been solved or that an unconnected live deployment exists.

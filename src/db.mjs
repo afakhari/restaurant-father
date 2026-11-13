@@ -51,5 +51,17 @@ export async function shiftSnapshot(user){return withTenant(user,async client=>{
      WHERE r.session_id=ANY($1::uuid[]) ORDER BY oi.updated_at DESC`,[sessionIds]),
    client.query('SELECT id,session_id,event_type,payload,created_at FROM order_events ORDER BY created_at DESC LIMIT 60')
  ]);
- return {restaurant:rests.rows[0]??null,branches:branches.rows,tables:tables.rows,menu:menu.rows,sessions,rounds:rounds.rows,items:items.rows,events:events.rows,me:{id:user.id,name:user.name,role:user.role,restaurantId:user.restaurantId}};
+ // Present only the data each authenticated employee needs. Hiding UI tabs alone
+ // never protects prices, cashier payment records or manager audit trails.
+ const role=user.role;
+ const visibleSessions=(role==='manager'||role==='cashier')?sessions:open.rows;
+ const permitted=new Set(visibleSessions.map(s=>s.id));
+ const safeRounds=rounds.rows.filter(r=>permitted.has(r.session_id));
+ const allowedRounds=new Set(safeRounds.map(r=>r.id));
+ const safeItems=items.rows.filter(i=>allowedRounds.has(i.round_id));
+ const projectedSessions=(role==='manager'||role==='cashier')?visibleSessions:visibleSessions.map(s=>({id:s.id,branch_id:s.branch_id,table_id:s.table_id,opened_at:s.opened_at,closed_at:s.closed_at,version:s.version,...(role==='waiter'?{discount_toman:s.discount_toman}: {})}));
+ const projectedItems=role==='kitchen'?safeItems.map(i=>({id:i.id,round_id:i.round_id,menu_item_id:i.menu_item_id,name_snapshot:i.name_snapshot,quantity:i.quantity,note:i.note,status:i.status,updated_at:i.updated_at})):safeItems;
+ const projectedMenu=role==='cashier'?[]:role==='kitchen'?menu.rows.map(m=>({id:m.id,category:m.category,name:m.name,available:m.available})):menu.rows;
+ const projectedRounds=role==='kitchen'?safeRounds.map(r=>({id:r.id,session_id:r.session_id,created_at:r.created_at})):safeRounds;
+ return {restaurant:rests.rows[0]??null,branches:branches.rows,tables:tables.rows,menu:projectedMenu,sessions:projectedSessions,rounds:projectedRounds,items:projectedItems,events:role==='manager'?events.rows:[],me:{id:user.id,name:user.name,role:user.role,restaurantId:user.restaurantId}};
  });}

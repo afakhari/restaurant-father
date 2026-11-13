@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {HttpError,parseRound,nextItemStatus,sumSubtotal,canCheckout,normalizeAIResult,requiredRole} from '../src/core.mjs';
+import {HttpError,parseRound,nextItemStatus,sumSubtotal,canCheckout,canVoidSession,normalizeAIResult,requiredRole} from '../src/core.mjs';
 const id='00000000-0000-4000-8000-000000000001';
 const key='00000000-0000-4000-8000-000000000003';
 test('round accepts valid line and rejects forged client price',()=>{
@@ -20,7 +20,10 @@ test('status transitions and cancellation require valid role and reason',()=>{
  assert.equal(nextItemStatus('preparing','ready','kitchen'),'ready');
  assert.equal(nextItemStatus('ready','served','waiter'),'served');
  assert.throws(()=>nextItemStatus('ready','queued','manager'),e=>e.status===409);
- assert.throws(()=>nextItemStatus('preparing','cancelled','manager','because'),e=>e.status===409);
+ assert.equal(nextItemStatus('preparing','cancelled','manager','ناموجود'), 'cancelled');
+ assert.equal(nextItemStatus('ready','cancelled','manager','مشکل کیفیت'), 'cancelled');
+ assert.throws(()=>nextItemStatus('preparing','cancelled','waiter','ناموجود'),e=>e.status===403);
+ assert.throws(()=>nextItemStatus('ready','cancelled','kitchen','خرابی'),e=>e.status===403);
  assert.throws(()=>nextItemStatus('queued','cancelled','waiter','x'),e=>e.status===400);
 });
 test('bill excludes cancelled items and cannot checkout until all served',()=>{
@@ -28,6 +31,9 @@ test('bill excludes cancelled items and cannot checkout until all served',()=>{
  assert.equal(sumSubtotal(items),600000);assert.equal(canCheckout(items),true);
  assert.equal(canCheckout([...items,{quantity:1,unit_price_toman:1000,status:'ready'}]),false);
  assert.equal(canCheckout([{quantity:1,unit_price_toman:1000,status:'cancelled'}]),false);
+ assert.equal(canVoidSession([{status:'cancelled'}]),true);
+ assert.equal(canVoidSession([{status:'cancelled'},{status:'served'}]),false);
+ assert.equal(canVoidSession([]),false);
 });
 test('AI only accepts existing menu IDs and bounded quantities',()=>{
  const menu=[{id,available:true},{id:'00000000-0000-4000-8000-000000000002',available:false}];

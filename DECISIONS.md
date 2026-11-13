@@ -74,3 +74,29 @@ Each decision documents **decision / why / alternative / accepted trade-off**, r
 - **Why:** Draft loss costs a real order, and irreversible money-related actions merit explicit language.
 - **Alternative:** Persist every draft server-side and support resumption across devices, or a keyboard-only native browser confirmation.
 - **Trade-off:** In-memory draft is still lost on a hard crash or session expiry. Persistent cross-device drafts and a full accessibility audit remain future work.
+
+
+## D-11 — Manager-only cancellation of started tickets and zero-payment void (scope refinement)
+- **Decision:** Allow manager cancellation of PREPARING/READY-but-not-SERVED items with a recorded reason; add a guarded, version-checked close operation only for sessions whose *every* item is cancelled. Payment fields remain NULL.
+- **Why:** A stockout after cooking begins or a fully cancelled order would otherwise leave the table permanently blocked or force staff to fabricate service/payment. This is a correction discovered through live-shift exception review, not an added POS module.
+- **Alternative:** Staff manually mark cancelled food served and invent a zero-toman transaction, or allow all roles to cancel at any stage.
+- **Trade-off:** More state transitions, an explicit extra endpoint and regression tests. The original `SCOPE.md` remains the pre-build agreement; this deviation is explicitly recorded here. Served-item refunds are still excluded.
+
+## D-12 — Role-specific API projection, not just navigation (security correction)
+- **Decision:** Kitchen responses omit prices, discounts, payment and event history; waiter responses omit historical receipts and manager audit; cashier receives current/closed billing information without the editable menu feed. Manager retains cross-workflow events.
+- **Why:** Hiding checkout tabs in the browser is not data authorization. A kitchen employee can inspect a JSON response even when the UI does not show a receipt.
+- **Alternative:** Return one rich `/api/shift` payload to everyone and hide fields using CSS/JavaScript.
+- **Trade-off:** The shared snapshot endpoint now applies explicit response projections; future roles need carefully tested privacy contracts, ideally separate read endpoints.
+
+## D-13 — Locale normalization only at presentation/input boundary
+- **Decision:** Accept Persian/Arabic/Latin digits and grouping for cashier discount, normalize Persian/Arabic keyboard variants for menu search, and allow distinct notes for identical food items. Server APIs still require validated integer toman, not strings or rial.
+- **Why:** Iranian staff may use heterogeneous mobile keyboards; manual correction is costly during a shift.
+- **Alternative:** Require ASCII digits and exact Persian spelling everywhere.
+- **Trade-off:** Dedicated input parsing and tests; no automatic currency inference or fractional money is permitted.
+
+
+## D-14 — Reject edited retries rather than silently reuse a prior round
+- **Decision:** Idempotency replay verifies the original item IDs, quantities and notes in a canonical order; changed payloads return 409 and require the waiter to review the table and submit a fresh round.
+- **Why:** The server may commit an order while its network response is lost. A subsequent edited retry must not report success for an older, different order.
+- **Alternative:** Deduplicate solely by actor-provided idempotency key, regardless of content.
+- **Trade-off:** One small indexed lookup of original order lines on replay; bounded to twelve lines per round.
