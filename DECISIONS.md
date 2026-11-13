@@ -8,8 +8,8 @@ Each decision documents **decision / why / alternative / accepted trade-off**, r
 - **Alternative:** A single mutable order JSON document for each table, overwritten on every edit.
 - **Trade-off:** More relational entities and explicit session lifecycle in return for safer updates and accurate final billing.
 
-## D-02 — Table-level serialization and idempotent order creation (keep)
-- **Decision:** For each mutation lock the dining table row before its session; add rounds transactionally; use a client-generated idempotency UUID; verify item status on writes.
+## D-02 — Table-scoped serialization and idempotent order creation (keep)
+- **Decision:** For each mutation take a transaction-scoped advisory lock keyed by table UUID before locking its session row; add rounds transactionally; use a client-generated idempotency UUID; verify item status on writes.
 - **Why:** Two waiters and kitchen/cashier may act on the same table. Network retries can duplicate charges.
 - **Alternative:** Optimistic full-document PUT with only a version counter, or a distributed queue.
 - **Trade-off:** Hot-table contention and additional round-trip latency. This is acceptable for a small branch and clearly breaks under severe table-specific write contention.

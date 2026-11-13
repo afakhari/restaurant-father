@@ -14,7 +14,7 @@
 
 **Threat:** concurrent waiters overwrite a round, kitchen changes a stale item, or a retry creates two tickets.
 
-**Controls:** per-table row locks followed by session locks across all writer workflows; append-only order rounds; unique `(restaurant_id,created_by,idempotency_key)`; a recheck *under lock* for concurrent retries; mandatory `expectedStatus` for item changes; `expectedVersion` for discount and checkout; legal per-role transition graph. All changes commit in one Postgres transaction or roll back.
+**Controls:** per-table advisory transaction locks followed by session row locks across all writer workflows; append-only order rounds; unique `(restaurant_id,created_by,idempotency_key)`; a recheck *under lock* for concurrent retries; mandatory `expectedStatus` for item changes; `expectedVersion` for discount and checkout; legal per-role transition graph. All changes commit in one Postgres transaction or roll back.
 
 **Evidence:** concurrency integration test sends two round requests concurrently and checks both persist, then replays one identical key; transition unit tests reject illegal role/state operations.
 

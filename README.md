@@ -69,7 +69,7 @@ RTL browser (vanilla JS, zero frontend build step)
 
 - The runtime DB user `restaurant_runtime` is explicitly **non-superuser, NO BYPASSRLS**, separate from the one-time migrator role.
 - Every restaurant-domain table uses **FORCE ROW LEVEL SECURITY**; without a transaction-local `app.tenant_id`, queries return zero rows. The value comes from the authenticated server session, not from request body.
-- The server serializes writes **by locking the table row and then its active session**. Two simultaneous new rounds both persist. Two retries with the same idempotency key resolve to the same round. Locking is consistent across order creation, item status, discount and checkout.
+- The server serializes writes **using a transaction-scoped advisory lock keyed by table UUID, followed by an active-session row lock**. Two simultaneous new rounds both persist. Two retries with the same idempotency key resolve to the same round. Locking is consistent across order creation, item status, discount and checkout.
 - Explicit role and state-transition validation deny kitchen price changes, waiter payments, cancellation after cooking begins, and closing a session with undelivered food.
 - All receipt totals are calculated in the server from integer toman snapshots, not from browser totals or LLM output.
 - Writes require JSON and a matching `Origin`; cookie is `HttpOnly`, `SameSite=Strict`, optionally `Secure`. Secrets are environment variables; they are not committed.

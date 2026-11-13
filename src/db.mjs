@@ -19,7 +19,9 @@ export async function requireSession(client,id,{lock=false}={}){
   return s.rows[0];
 }
 export async function lockTable(client,tableId){
-  const t=await client.query('SELECT * FROM dining_tables WHERE id=$1 FOR UPDATE',[tableId]);
+  // Advisory transaction lock serializes writers without granting UPDATE on table definitions.
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))',[tableId]);
+  const t=await client.query('SELECT * FROM dining_tables WHERE id=$1',[tableId]);
   if(!t.rowCount)throw new HttpError(404,'NOT_FOUND','میز پیدا نشد.');
   return t.rows[0];
 }
