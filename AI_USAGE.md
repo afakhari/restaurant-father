@@ -7,7 +7,7 @@ This project was produced with assistance from **OpenAI ChatGPT (GPT-6)** and th
 - **ChatGPT / GPT-6:** compared existing open-source restaurant products, proposed product scope, mapped Iranian UX/service workflow, drafted the database schema, HTTP API, RTL UI, seed, test scenarios, security review and documentation. It generated a substantial share of implementation code. Human review before submission is still needed.
 - **GitHub connector:** searched source repositories, inspected representative order/kitchen/cashier code, verified target repository permissions, created a feature branch and committed `SCOPE.md` **before implementation**, and prepared product changes as a reviewable PR.
 - **Local Node.js:** executed `node --check` and six pure unit tests in `node --test`; outputs were examined.
-- **Automated PostgreSQL tests:** authored as an integration suite run by GitHub Actions, but not asserted as locally executed. The authoring environment lacked Docker and npm registry access, so actual DB execution status must be checked from CI.
+- **Automated PostgreSQL tests:** GitHub Actions provisioned PostgreSQL 16 and ran migration, seed, six unit tests, and five real integration tests **successfully** on `main` (run `43479468638`). The tests were not locally executed with PostgreSQL in the authoring environment, which lacks a Docker daemon.
 
 ## What AI genuinely accelerated
 
@@ -32,7 +32,7 @@ Discovery of existing interaction patterns (table sessions, per-item KDS transit
 
 - Verified JSON body parsing, UUID/quantity bounds, price snapshot trust boundary, state transitions, discounts, checkout guards, cookie flags, origin checks and tenant scoping in source.
 - Ran local JS syntax checks and unit tests for domain rules, including no client price trust, legal/illegal item transitions, bill totals and AI menu ID validation. Unit tests: **6/6 passed in the authoring environment**.
-- Wrote a DB integration suite and CI workflow for independent tenant data, direct RLS no-context checks, concurrent round submissions, duplicate retry, role isolation, full order-to-checkout and CSRF. **Do not call these tests passing until CI confirms them.**
+- Wrote a DB integration suite and CI workflow for independent tenant data, direct RLS no-context checks, concurrent round submissions, duplicate retry, role isolation, full order-to-checkout and CSRF. **GitHub Actions confirmed all 5/5 integration tests passing** on the merged `main` branch (run `43479468638`), in addition to 6/6 unit tests.
 - No hand-run multi-device test, provider-side injection red-team, real banking test, external penetration test or full load test was completed. Those limitations are not hidden.
 
 ## Architecture decisions that came from our product reasoning
@@ -48,8 +48,10 @@ This repository was produced in a longer Persian-language discussion, including 
 - «بله همین کار را به طور کامل انجام بده»
 - «بر اساس تسک و یافته هایت اقدامات لازم را به طور کامل در گیت هاب انجام بده و پیش برو.»
 
-The most recent request also contained the full English **Senior Full-Stack Engineer — Solo AI Builder Assessment** and specified the target repository `https://github.com/afakhari/restaurant-father`. The task was not given to AI as an empty, standalone feature checklist; product choices were discussed first. No fictional prompt history or hidden tests are claimed.
+A subsequent user request, «تمامی اقدامات لازم را انجام بده», authorized continuing the release work. The earlier implementation request also contained the full English **Senior Full-Stack Engineer — Solo AI Builder Assessment** and specified the target repository `https://github.com/afakhari/restaurant-father`. The task was not given to AI as an empty, standalone feature checklist; product choices were discussed first. No fictional prompt history or hidden tests are claimed.
 
 ## AI API failure/cost/prompt-injection posture
 
 Provider call is optional and server-side, with an HTTPS endpoint, timeout, low temperature, at most 300 output tokens and an explicitly bounded menu subset. User notes are untrusted content; the prompt instructs the provider to return JSON only, but prompt text is **not the security boundary**. A second server-side parser discards unknown menu IDs, invalid counts and extraneous properties. A cashier or kitchen action is never delegated to AI. Provider errors fail visibly and allow manual ordering. This bounded design controls the common hallucination/cost/latency risks but has not been independently adversarially evaluated.
+
+An export of the actual user instructions and the runtime AI system prompt for the ATS prompt field is in [AI_PROMPTS.md](AI_PROMPTS.md). Browser recordings, if generated in CI, are explicitly labeled automated and do not imply candidate-narrated video.

@@ -15,3 +15,7 @@
 | 6:45–7:45 | `DECISIONS.md`, `HANDOVER.md`, `AI_USAGE.md` | What went wrong, which two decisions we'd change, where 1k/100k scale fails, full AI assistance disclosure |
 
 Do not claim deployed HTTPS, real AI output, passing integration tests or running video unless independently confirmed. The operator should capture screen and voice from a real running instance, and put a verifiable URL in the final submission.
+
+## Browser evidence as a visual aid, not candidate narration
+
+If the `Browser UX walkthrough and evidence` CI workflow passes, download its `real-app-browser-evidence` artifact from the run. Screenshots and `automated-browser-tour.webm` show genuine web UI interactions against a seeded ephemeral PostgreSQL instance. You may use the frames while recording your own narrated 5–10 minute presentation, but you must genuinely explain product decisions and disclose AI assistance. The automated video is **shorter than the required walkthrough** and contains no personal explanation.
