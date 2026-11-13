@@ -10,6 +10,7 @@ import {shiftSnapshot} from './db.mjs';
 import {addRound,transitionItem,setDiscount,checkout} from './operations.mjs';
 import {limitLogin} from './rate-limit.mjs';
 
+const featureFlags=()=>({aiEnabled:Boolean(process.env.AI_API_URL&&process.env.AI_API_KEY&&process.env.AI_MODEL)});
 const staticDir=path.join(path.dirname(fileURLToPath(import.meta.url)),'public');
 const staticMap={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css'};
 const mime={'html':'text/html; charset=utf-8','js':'text/javascript; charset=utf-8','css':'text/css; charset=utf-8'};
@@ -65,12 +66,12 @@ export function createServer(){return http.createServer(async(req,res)=>{
   if(route.startsWith('/api/')&&req.method==='POST')csrf(req);
   if(route==='/api/auth/login'&&req.method==='POST'){
     const body=await readBody(req);limitLogin(req,body?.email);const result=await login(body.email,body.password);
-    res.setHeader('Set-Cookie',cookie('shiftyar_session',result.token));answer(res,200,{me:result.user});return;
+    res.setHeader('Set-Cookie',cookie('shiftyar_session',result.token));answer(res,200,{me:result.user,features:featureFlags()});return;
   }
   if(route==='/api/auth/logout'&&req.method==='POST'){await logout(req);res.setHeader('Set-Cookie',cookie('shiftyar_session','',{clear:true}));answer(res,200,{ok:true});return;}
   if(route.startsWith('/api/')){
     actor=await authenticate(req);if(!actor)throw new HttpError(401,'AUTH','برای ادامه وارد حساب شوید.');
-    if(route==='/api/me'&&req.method==='GET'){answer(res,200,{me:actor});return;}
+    if(route==='/api/me'&&req.method==='GET'){answer(res,200,{me:actor,features:featureFlags()});return;}
     if(route==='/api/shift'&&req.method==='GET'){answer(res,200,await shiftSnapshot(actor));return;}
     if(route==='/api/rounds'&&req.method==='POST'){answer(res,201,await addRound(actor,await readBody(req)));return;}
     const tr=route.match(/^\/api\/items\/([0-9a-f-]+)\/transition$/i);

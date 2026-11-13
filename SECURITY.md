@@ -39,3 +39,8 @@
 - **Not implemented:** MFA, credential reset, distributed edge rate limiting, alerting backend, strong branch-specific RBAC, HSTS from reverse proxy, audit export, retention policy, production backups, disaster recovery, stress/load testing, external security assessment. These are requirements for a real customer deployment, not hidden deliverables.
 
 **Login throttling:** the Node process now caps attempts per remote IP and email within a 15-minute window. This is memory-only and is not sufficient for a multi-replica or Internet-exposed service without trusted-edge throttling and monitoring.
+
+
+## UI-specific safeguards
+
+The current interface asks for explicit confirmation before deleting an unsubmitted order draft or attesting a received payment; these are **error-prevention UX measures, not server authorization**. The server independently validates roles, snapshot price, session version and settlement eligibility. The optional AI-enabled flag exposes only whether configuration exists, never a provider key. The in-memory draft does not survive a browser crash, and the connection indicator is not an offline durable queue. See the separate UX audit for responsive and accessibility boundaries.

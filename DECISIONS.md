@@ -61,3 +61,16 @@ Each decision documents **decision / why / alternative / accepted trade-off**, r
 - **Why:** The application should not run with DDL rights or SUPERUSER privileges just to load its tables.
 - **Alternative:** One shared Postgres superuser credential for everything.
 - **Trade-off:** A service ordering/deployment step and two DB passwords are required. Changing database schema across large environments later needs versioned, reversible migrations rather than just replaying initial setup SQL.
+
+
+## D-11 — Small-screen step-by-step ordering (keep)
+- **Decision:** Keep the three-pane desktop workplace, but use explicit Tables → Menu → Order steps and a fixed draft summary under 1000px.
+- **Why:** A phone-sized employee interface used to place the cart after a long list of tables and dishes. A busy waiter must be able to inspect the cart without retracing the whole page.
+- **Alternative:** One continuously scrolling vertical page or a slide-over cart with nested gestures.
+- **Trade-off:** One extra tap when switching between menus and table context; clearer navigation and fewer accidental actions.
+
+## D-12 — Guard navigation and provide native accessible dialog (keep, revisit)
+- **Decision:** Ask for confirmation before clearing a draft during table/branch/logout switches, and use a styled in-app dialog for cancellation and cashier receipt confirmation.
+- **Why:** Draft loss costs a real order, and irreversible money-related actions merit explicit language.
+- **Alternative:** Persist every draft server-side and support resumption across devices, or a keyboard-only native browser confirmation.
+- **Trade-off:** In-memory draft is still lost on a hard crash or session expiry. Persistent cross-device drafts and a full accessibility audit remain future work.
