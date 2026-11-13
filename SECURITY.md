@@ -36,4 +36,6 @@
 - SameSite=Strict, HttpOnly, optional Secure cookies; JSON-only writes and a matching Origin. Set `PUBLIC_ORIGIN` and `COOKIE_SECURE=true` for HTTPS.
 - Security headers: no framing, restrictive CSP, no sniffing, no referrer. UI escapes database-controlled text prior to rendering.
 - Bounded 64 KiB JSON requests; AI note max 320 chars; no secrets or full food notes in request logs; trace ID on errors.
-- **Not implemented:** MFA, credential reset, account lockout/login rate limiting, alerting backend, strong branch-specific RBAC, HSTS from reverse proxy, audit export, retention policy, production backups, disaster recovery, stress/load testing, external security assessment. These are requirements for a real customer deployment, not hidden deliverables.
+- **Not implemented:** MFA, credential reset, distributed edge rate limiting, alerting backend, strong branch-specific RBAC, HSTS from reverse proxy, audit export, retention policy, production backups, disaster recovery, stress/load testing, external security assessment. These are requirements for a real customer deployment, not hidden deliverables.
+
+**Login throttling:** the Node process now caps attempts per remote IP and email within a 15-minute window. This is memory-only and is not sufficient for a multi-replica or Internet-exposed service without trusted-edge throttling and monitoring.

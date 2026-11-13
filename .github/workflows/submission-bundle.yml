@@ -1,4 +1,4 @@
-name: Package Abrnac ATS documentation
+name: Package ShiftYar release documents
 on:
   push:
     branches: [main]
@@ -9,7 +9,7 @@ on:
       - 'HANDOVER.md'
       - 'README.md'
       - 'AI_PROMPTS.md'
-      - 'ATS_SUBMISSION.md'
+      - 'SUBMISSION_CHECKLIST.md'
       - '.github/workflows/submission-bundle.yml'
   workflow_dispatch:
 permissions:
@@ -22,20 +22,20 @@ jobs:
       - name: Assert all required documents exist
         run: |
           set -eu
-          for file in README.md SCOPE.md DECISIONS.md AI_USAGE.md HANDOVER.md AI_PROMPTS.md ATS_SUBMISSION.md; do
+          for file in README.md SCOPE.md DECISIONS.md AI_USAGE.md HANDOVER.md AI_PROMPTS.md SUBMISSION_CHECKLIST.md; do
             test -s "$file"
           done
       - name: Create upload-ready ZIP
         run: |
-          mkdir -p dist/abrnac-documentation
-          cp README.md SCOPE.md DECISIONS.md AI_USAGE.md HANDOVER.md AI_PROMPTS.md ATS_SUBMISSION.md dist/abrnac-documentation/
-          cp SECURITY.md DEPLOY.md WALKTHROUGH.md dist/abrnac-documentation/
-          mkdir -p dist/abrnac-documentation/docs
-          cp docs/UX_BLUEPRINT.fa.md dist/abrnac-documentation/docs/
-          cd dist && zip -qr abrnac-project-documentation.zip abrnac-documentation
-      - name: Upload ATS attachments
+          mkdir -p dist/shiftyar-documentation
+          cp README.md SCOPE.md DECISIONS.md AI_USAGE.md HANDOVER.md AI_PROMPTS.md SUBMISSION_CHECKLIST.md dist/shiftyar-documentation/
+          cp SECURITY.md DEPLOY.md WALKTHROUGH.md dist/shiftyar-documentation/
+          mkdir -p dist/shiftyar-documentation/docs
+          cp docs/UX_BLUEPRINT.fa.md dist/shiftyar-documentation/docs/
+          cd dist && zip -qr shiftyar-project-documentation.zip shiftyar-documentation
+      - name: Upload release documentation
         uses: actions/upload-artifact@v4
         with:
-          name: abrnac-ats-documentation
-          path: dist/abrnac-project-documentation.zip
+          name: shiftyar-release-documents
+          path: dist/shiftyar-project-documentation.zip
           retention-days: 7
