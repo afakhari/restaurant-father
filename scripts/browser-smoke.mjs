@@ -92,6 +92,13 @@ try {
   await page.locator('#discount-input').fill('10000');
   await page.locator('[data-action="discount"]').click();
   await page.locator('[data-action="checkout"]').click();
+  await page.locator('#action-dialog[open]').waitFor();
+  assert.match(await page.locator('#dialog-details').innerText(), /دریافت شده است/);
+  const [checkoutResponse] = await Promise.all([
+    page.waitForResponse(res=>res.url().includes('/checkout') && res.request().method()==='POST'),
+    page.locator('#dialog-confirm').click(),
+  ]);
+  assert.equal(checkoutResponse.status(),200,'Cashier receipt confirmation must actually settle the table');
   await page.locator('.history-line').filter({ hasText: 'میز ۸' }).waitFor();
   await snap('09-cashier-settled');
   await logout();
@@ -101,20 +108,55 @@ try {
   assert.equal(await page.locator('body').textContent().then(t => t.includes('چلوکباب کوبیده')), false, 'No Narenj menu may leak into Darband tenant');
   await snap('10-independent-tenant');
 
+  // Responsive matrix for the *actual* database-backed UI: no hidden ordering flow,
+  // horizontal overflow, or inaccessible order review at common phone/tablet widths.
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
   try {
     const mobilePage = await mobile.newPage();
+    mobilePage.on('pageerror', e => consoleErrors.push(e.message));
     await mobilePage.goto(origin, { waitUntil: 'domcontentloaded' });
     await mobilePage.locator('#email').fill('waiter@narenj.demo');
     await mobilePage.locator('#password').fill(password);
     await mobilePage.locator('#login-submit').click();
     await mobilePage.locator('.main-nav').waitFor();
+    await mobilePage.locator('.hall-layout[data-mobile-stage="tables"] .table-tile').first().waitFor();
     await mobilePage.screenshot({path:path.join(output,'11-mobile-waiter.png'),fullPage:true});
-    const sizes = await mobilePage.evaluate(() => ({ viewport: window.innerWidth, root: document.documentElement.scrollWidth }));
-    assert.ok(sizes.root <= sizes.viewport + 5, `Unexpected mobile horizontal overflow: ${JSON.stringify(sizes)}`);
+    await mobilePage.locator('.table-tile').filter({ hasText:'میز ۳' }).click();
+    await mobilePage.locator('.hall-layout[data-mobile-stage="menu"] button.add').first().waitFor();
+    await mobilePage.locator('button.add').first().click();
+    await mobilePage.locator('.mobile-draft-bar').waitFor({state:'visible'});
+    await mobilePage.screenshot({path:path.join(output,'12-mobile-menu-cart.png'),fullPage:true});
+    await mobilePage.locator('.mobile-draft-bar [data-id="order"]').click();
+    await mobilePage.locator('.hall-layout[data-mobile-stage="order"] .draft-line').first().waitFor();
+    await mobilePage.screenshot({path:path.join(output,'13-mobile-order-review.png'),fullPage:true});
+    // A navigation across tables must not silently discard a typed draft.
+    await mobilePage.locator('.hall-step[data-id="tables"]').click();
+    mobilePage.once('dialog',dialog=>dialog.dismiss());
+    await mobilePage.locator('.table-tile').filter({hasText:'میز ۴'}).click();
+    assert.equal(await mobilePage.locator('.mobile-draft-bar').isVisible(),true,'Declining a change must preserve the cart');
+    for(const width of [320,360,390,768,1024,1440]){
+      await mobilePage.setViewportSize({width,height:844});
+      const size=await mobilePage.evaluate(()=>({viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth}));
+      assert.ok(size.scrollWidth<=size.viewport+2,`Waiter layout overflows ${width}px: ${JSON.stringify(size)}`);
+    }
   } finally { await mobile.close(); }
+  for(const role of ['kitchen@narenj.demo','cashier@narenj.demo']){
+    const roleCtx=await browser.newContext({viewport:{width:390,height:844}});
+    try{
+      const rolePage=await roleCtx.newPage();
+      rolePage.on('pageerror', e=>consoleErrors.push(e.message));
+      await rolePage.goto(origin,{waitUntil:'domcontentloaded'});
+      await rolePage.locator('#email').fill(role);
+      await rolePage.locator('#password').fill(password);
+      await rolePage.locator('#login-submit').click();
+      await rolePage.locator('.main-nav').waitFor();
+      const size=await rolePage.evaluate(()=>({viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth}));
+      assert.ok(size.scrollWidth<=size.viewport+2,`Role ${role} overflows on phone`);
+      await rolePage.screenshot({path:path.join(output,role.startsWith('kitchen')?'14-mobile-kitchen.png':'15-mobile-cashier.png'),fullPage:true});
+    }finally{await roleCtx.close();}
+  }
   assert.deepEqual(consoleErrors, [], 'Browser must not raise uncaught JS errors');
-  await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify({passed:true,rounds,roles:['waiter','kitchen','cashier','manager'],stages:['order','prepare','ready','serve','checkout','tenant-isolation','mobile'],consoleErrors},null,2));
+  await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify({passed:true,rounds,roles:['waiter','kitchen','cashier','manager'],stages:['order','prepare','ready','serve','checkout','tenant-isolation','mobile-steps','draft-loss-prevention','responsive-matrix'],consoleErrors},null,2));
   finalized = true;
   console.log('BROWSER_ACCEPTANCE_PASS: waiter, kitchen, handoff, cashier, tenant isolation and mobile');
 } catch (err) {

@@ -10,6 +10,7 @@ on:
       - 'README.md'
       - 'AI_PROMPTS.md'
       - 'SUBMISSION_CHECKLIST.md'
+      - 'docs/UX_AUDIT.fa.md'
       - '.github/workflows/submission-bundle.yml'
   workflow_dispatch:
 permissions:
@@ -31,7 +32,7 @@ jobs:
           cp README.md SCOPE.md DECISIONS.md AI_USAGE.md HANDOVER.md AI_PROMPTS.md SUBMISSION_CHECKLIST.md dist/shiftyar-documentation/
           cp SECURITY.md DEPLOY.md WALKTHROUGH.md dist/shiftyar-documentation/
           mkdir -p dist/shiftyar-documentation/docs
-          cp docs/UX_BLUEPRINT.fa.md dist/shiftyar-documentation/docs/
+          cp docs/UX_BLUEPRINT.fa.md docs/UX_AUDIT.fa.md dist/shiftyar-documentation/docs/
           cd dist && zip -qr shiftyar-project-documentation.zip shiftyar-documentation
       - name: Upload release documentation
         uses: actions/upload-artifact@v4

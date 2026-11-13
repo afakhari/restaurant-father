@@ -19,3 +19,8 @@ Do not claim deployed HTTPS, real AI output, passing integration tests or runnin
 ## Browser evidence as a visual aid, not candidate narration
 
 If the `Browser UX walkthrough and evidence` CI workflow passes, download its `real-app-browser-evidence` artifact from the run. Screenshots and `automated-browser-tour.webm` show genuine web UI interactions against a seeded ephemeral PostgreSQL instance. You may use the frames while recording your own narrated 5–10 minute presentation, but you must genuinely explain product decisions and disclose AI assistance. The automated video is **shorter than the required walkthrough** and contains no personal explanation.
+
+
+## Updated interaction sequence for recording
+
+On a **phone**, demonstrate the three ordering steps (table → menu → order), the sticky draft summary, note editing, and the confirmation warning when changing tables with an unsubmitted draft. Show a cashier checkout confirmation in the application's own dialog. State clearly that the "connection status" label reflects the last server snapshot and is not a durable offline order queue. The latest UX acceptance matrix and limits are in [docs/UX_AUDIT.fa.md](docs/UX_AUDIT.fa.md).

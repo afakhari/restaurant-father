@@ -139,3 +139,13 @@ For the final handover form and exact prompt disclosure, see [SUBMISSION_CHECKLI
 ## Snapshot consistency and public-login protection
 
 The shift snapshot now reads **every open table session** and all its rounds/items; only closed history is limited to 20 latest sessions. This prevents a busy restaurant from losing an older active ticket due to a global newest-N limit. The demo login endpoint has a small in-memory IP+account throttle (8 attempts per account+IP, 100 per IP per 15 minutes); hosting still needs distributed edge limits and monitoring. The integration suite covers absent-provider and stub-provider AI paths; a simulated provider **does not** prove that a paid/production model is configured or accurate.
+
+
+## UX acceptance and accessibility review
+
+- [UX audit (Persian)](docs/UX_AUDIT.fa.md): strict visual/interaction review, responsive matrix, risk register and evidence boundaries.
+- On phones/tablets up to 1000px, waiter ordering uses **Tables → Menu → Order** steps plus a fixed draft summary. The table session and submitted rounds remain shared with kitchen/cashier as before.
+- A draft is confirmed before navigating to another table/branch; typed AI note input survives view redraw; kitchen tickets, totals and status labels use increased contrast, size and touch targets.
+- Cancel and settle are confirmed using in-app dialogs. A sync status indicator distinguishes a working last fetch from an offline fetch. If AI provider credentials are absent the UI says the option is unavailable rather than displaying an unusable trigger.
+- The browser CI now exercises desktop/mobile UI roles and 320, 360, 390, 768, 1024 and 1440px horizontal overflow, and tests draft loss prevention. This is **Chromium evidence, not an iOS/Safari or WCAG certification**.
+- `npm run audit:release` checks the existence and core sections of required documentation, while `npm run check` runs JS syntax checks. See the CI workflow for the full database-backed acceptance test.

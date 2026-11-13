@@ -35,6 +35,7 @@ jobs:
           node-version: '22'
       - run: npm install --no-audit --no-fund
       - run: npm run check
+      - run: npm run audit:release
       - run: npm test
       - run: npm run migrate
       - run: npm run seed
