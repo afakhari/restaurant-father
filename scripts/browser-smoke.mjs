@@ -94,7 +94,11 @@ try {
   await page.locator('[data-action="checkout"]').click();
   await page.locator('#action-dialog[open]').waitFor();
   assert.match(await page.locator('#dialog-details').innerText(), /دریافت شده است/);
-  await page.locator('#dialog-confirm').click();
+  const [checkoutResponse] = await Promise.all([
+    page.waitForResponse(res=>res.url().includes('/checkout') && res.request().method()==='POST'),
+    page.locator('#dialog-confirm').click(),
+  ]);
+  assert.equal(checkoutResponse.status(),200,'Cashier receipt confirmation must actually settle the table');
   await page.locator('.history-line').filter({ hasText: 'میز ۸' }).waitFor();
   await snap('09-cashier-settled');
   await logout();
