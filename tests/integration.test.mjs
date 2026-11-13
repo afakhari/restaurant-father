@@ -55,6 +55,17 @@ test('parallel round additions survive, retries are idempotent, tenant cannot al
  assert.equal(a.status,201);assert.equal(b.status,201);assert.notEqual(a.body.roundId,b.body.roundId);
  const replay=await request('waiter','POST','/api/rounds',payloadA);
  assert.equal(replay.status,201);assert.equal(replay.body.replayed,true);assert.equal(replay.body.roundId,a.body.roundId);
+ // Reusing the same idempotency key on a different table must NOT silently return the old round.
+ const otherTable=A.tables.find(x=>x.id!==t.id);
+ const wrongTable=await request('waiter','POST','/api/rounds',{...payloadA,tableId:otherTable.id,expectedSessionId:null});
+ assert.equal(wrongTable.status,409);
+ // A simultaneous retry of the same key must produce one round, not a unique-constraint 500.
+ const retryKey=crypto.randomUUID();
+ const dup={...payloadB,idempotencyKey:retryKey};
+ const [firstRetry,secondRetry]=await Promise.all([request('waiter','POST','/api/rounds',dup),request('waiter','POST','/api/rounds',dup)]);
+ assert.equal(firstRetry.status,201);assert.equal(secondRetry.status,201);
+ assert.equal(firstRetry.body.roundId,secondRetry.body.roundId);
+ assert.equal([firstRetry.body.replayed,secondRetry.body.replayed].filter(Boolean).length,1);
  const updated=(await shift('waiter')).body;const ids=itemsFor(updated,s.id);
  assert.equal(ids.filter(x=>x.round_id===a.body.roundId).length,1);
  assert.equal(ids.filter(x=>x.round_id===b.body.roundId).length,1);

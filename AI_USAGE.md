@@ -16,10 +16,11 @@ Discovery of existing interaction patterns (table sessions, per-item KDS transit
 ## What AI initially got wrong or underspecified
 
 1. The first CI run exposed a missing UPDATE privilege for a `SELECT ... FOR UPDATE` lock on `dining_tables`. The lock was replaced with an advisory transaction lock keyed by table UUID, preserving serialization without broadening write privileges on the table.
-2. The first order insertion draft checked the idempotency key before locking the table, but not *after* the lock. Two simultaneous retries could have raced to the database unique constraint and returned a 500. This was corrected by adding a second lookup under the table row lock.
-3. The initial migration granted UPDATE privileges on immutable order rounds and events. Those were reduced to SELECT/INSERT only for the runtime DB role.
-4. The proposed checkout rule is too strict for guests paying early. The current limitation is documented rather than represented as universal restaurant behavior.
-5. A successful in-memory UX prototype must not be misrepresented as a production-tested deployed app. A live HTTPS endpoint, real LLM provider and video are explicitly outstanding unless separately confirmed.
+2. The early idempotency fast path also needed to verify that a replay key belongs to the *same table*, not just the same actor. The wrong-table replay now returns 409 and the integration suite covers it.
+3. The first order insertion draft checked the idempotency key before locking the table, but not *after* the lock. Two simultaneous retries could have raced to the database unique constraint and returned a 500. This was corrected by adding a second lookup under the table row lock.
+4. The initial migration granted UPDATE privileges on immutable order rounds and events. Those were reduced to SELECT/INSERT only for the runtime DB role.
+5. The proposed checkout rule is too strict for guests paying early. The current limitation is documented rather than represented as universal restaurant behavior.
+6. A successful in-memory UX prototype must not be misrepresented as a production-tested deployed app. A live HTTPS endpoint, real LLM provider and video are explicitly outstanding unless separately confirmed.
 
 ## One recommendation intentionally rejected
 

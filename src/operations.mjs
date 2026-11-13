@@ -6,8 +6,11 @@ export async function addRound(user,raw){
  requiredRole(user,['waiter','manager']);const body=parseRound(raw);
  return withTenant(user,async client=>{
    // Same key already completed: returning it is safe even if the table was checked out since.
-   let previous=await client.query('SELECT id,session_id FROM order_rounds WHERE created_by=$1 AND idempotency_key=$2',[user.id,body.idempotencyKey]);
-   if(previous.rowCount)return {roundId:previous.rows[0].id,sessionId:previous.rows[0].session_id,replayed:true};
+   let previous=await client.query('SELECT r.id,r.session_id,s.table_id FROM order_rounds r JOIN table_sessions s ON s.id=r.session_id WHERE r.created_by=$1 AND r.idempotency_key=$2',[user.id,body.idempotencyKey]);
+   if(previous.rowCount){
+     if(previous.rows[0].table_id!==body.tableId)throw new HttpError(409,'IDEMPOTENCY_CONFLICT','کلید این درخواست قبلاً برای میز دیگری استفاده شده است.');
+     return {roundId:previous.rows[0].id,sessionId:previous.rows[0].session_id,replayed:true};
+   }
    const table=await lockTable(client,body.tableId);
    // Recheck after serializing on the table to handle simultaneous retries of the same key.
    previous=await client.query('SELECT r.id,r.session_id,s.table_id FROM order_rounds r JOIN table_sessions s ON s.id=r.session_id WHERE r.created_by=$1 AND r.idempotency_key=$2',[user.id,body.idempotencyKey]);
