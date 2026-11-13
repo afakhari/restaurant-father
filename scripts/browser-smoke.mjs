@@ -121,6 +121,14 @@ try {
     page.locator('#dialog-confirm').click(),
   ]);
   assert.equal(cancelResponse.status(),200,'Manager cancellation must be persisted');
+  await logout();
+  await login('cashier@narenj.demo');
+  await page.locator('.cash-table').filter({hasText:'میز ۷'}).click();
+  assert.match(await page.locator('.warn-box').innerText(),/از مدیر درخواست کنید/,'Cashier must be told who can release an all-cancelled table');
+  assert.equal(await page.locator('[data-action="void-session"]').count(),0,'Cashier must not receive manager-only action');
+  assert.equal(await page.locator('[data-action="checkout"]').isDisabled(),true,'All-cancelled table must never be paid');
+  await logout();
+  await login('manager@narenj.demo');
   await page.locator('.nav-btn[data-id="cashier"]').click();
   await page.locator('.cash-table').filter({hasText:'میز ۷'}).click();
   await page.locator('[data-action="void-session"]').click();
