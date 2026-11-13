@@ -89,7 +89,7 @@ try {
   const checkout = page.locator('button[data-action="checkout"]');
   assert.equal(await checkout.isDisabled(), false, 'Fully delivered table must be payable');
   await snap('08-cashier-bill');
-  await page.locator('#discount-input').fill('10000');
+  await page.locator('#discount-input').fill('۱۰٬۰۰۰');
   await page.locator('[data-action="discount"]').click();
   await page.locator('[data-action="checkout"]').click();
   await page.locator('#action-dialog[open]').waitFor();
@@ -107,6 +107,32 @@ try {
   await page.locator('.top-pill').filter({ hasText: 'رستوران دربند' }).waitFor();
   assert.equal(await page.locator('body').textContent().then(t => t.includes('چلوکباب کوبیده')), false, 'No Narenj menu may leak into Darband tenant');
   await snap('10-independent-tenant');
+  await logout();
+
+  // Manager-only exception: cancel a whole mistaken order and free the table
+  // WITHOUT falsifying a payment. This path has to work through the UI.
+  await login('manager@narenj.demo');
+  await chooseTable(7);
+  await sendRound('چای زعفرانی');
+  await page.locator('.current-item').filter({hasText:'چای زعفرانی'}).locator('[data-action="cancel"]').click();
+  await page.locator('#dialog-reason').fill('مشتری سفارش را لغو کرد');
+  const [cancelResponse]=await Promise.all([
+    page.waitForResponse(res=>res.url().includes('/transition')&&res.request().method()==='POST'),
+    page.locator('#dialog-confirm').click(),
+  ]);
+  assert.equal(cancelResponse.status(),200,'Manager cancellation must be persisted');
+  await page.locator('.nav-btn[data-id="cashier"]').click();
+  await page.locator('.cash-table').filter({hasText:'میز ۷'}).click();
+  await page.locator('[data-action="void-session"]').click();
+  await page.locator('#dialog-reason').fill('مشتری کل سفارش را لغو کرد');
+  const [voidResponse]=await Promise.all([
+    page.waitForResponse(res=>res.url().includes('/void')&&res.request().method()==='POST'),
+    page.locator('#dialog-confirm').click(),
+  ]);
+  assert.equal(voidResponse.status(),200,'Fully cancelled table must close without creating a payment');
+  await page.locator('.history-line').filter({hasText:'میز ۷'}).waitFor();
+  await snap('10b-manager-void-no-payment');
+  await logout();
 
   // Responsive matrix for the *actual* database-backed UI: no hidden ordering flow,
   // horizontal overflow, or inaccessible order review at common phone/tablet widths.
@@ -124,10 +150,20 @@ try {
     await mobilePage.locator('.table-tile').filter({ hasText:'میز ۳' }).click();
     await mobilePage.locator('.hall-layout[data-mobile-stage="menu"] button.add').first().waitFor();
     await mobilePage.locator('button.add').first().click();
+    await mobilePage.locator('button.add').first().click();
     await mobilePage.locator('.mobile-draft-bar').waitFor({state:'visible'});
     await mobilePage.screenshot({path:path.join(output,'12-mobile-menu-cart.png'),fullPage:true});
     await mobilePage.locator('.mobile-draft-bar [data-id="order"]').click();
     await mobilePage.locator('.hall-layout[data-mobile-stage="order"] .draft-line').first().waitFor();
+    await mobilePage.locator('.draft-line').first().locator('[data-action="split-note"]').click();
+    assert.equal(await mobilePage.locator('.draft-line').count(),2,'Two identical drinks must be split for distinct preparation notes');
+    await mobilePage.locator('[data-draft-note="1"]').fill('یکی بدون یخ');
+    await mobilePage.locator('.hall-step[data-id="menu"]').click();
+    await mobilePage.locator('#menu-search').fill('كباب'); // Arabic keyboard kāf, Persian stored ک
+    assert.ok(await mobilePage.locator('.menu-item').count()>0,'Arabic keyboard search must find Persian menu names');
+    await mobilePage.locator('#menu-search').fill('');
+    await mobilePage.locator('.hall-step[data-id="order"]').click();
+    assert.equal(await mobilePage.locator('[data-draft-note="1"]').inputValue(),'یکی بدون یخ');
     await mobilePage.screenshot({path:path.join(output,'13-mobile-order-review.png'),fullPage:true});
     // A navigation across tables must not silently discard a typed draft.
     await mobilePage.locator('.hall-step[data-id="tables"]').click();
@@ -156,7 +192,7 @@ try {
     }finally{await roleCtx.close();}
   }
   assert.deepEqual(consoleErrors, [], 'Browser must not raise uncaught JS errors');
-  await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify({passed:true,rounds,roles:['waiter','kitchen','cashier','manager'],stages:['order','prepare','ready','serve','checkout','tenant-isolation','mobile-steps','draft-loss-prevention','responsive-matrix'],consoleErrors},null,2));
+  await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify({passed:true,rounds,roles:['waiter','kitchen','cashier','manager'],stages:['order','prepare','ready','serve','checkout','tenant-isolation','mobile-steps','draft-loss-prevention','responsive-matrix','persian-discount','manager-void','split-notes','arabic-keyboard-search'],consoleErrors},null,2));
   finalized = true;
   console.log('BROWSER_ACCEPTANCE_PASS: waiter, kitchen, handoff, cashier, tenant isolation and mobile');
 } catch (err) {

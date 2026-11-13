@@ -65,12 +65,19 @@ RTL browser (vanilla JS, zero frontend build step)
 - `order_items`: independent statuses (`queued`, `preparing`, `ready`, `served`, `cancelled`), immutable server-chosen name/price snapshots per round.
 - `order_events`: timestamped actor and action audit trail, with no customer personal information.
 
+### Persian and Iranian workflows
+
+The UI is right-to-left and uses Persian calendar dates in the Tehran time zone, with prices explicitly in integer **toman**. Cashier discount entry accepts Persian (`۵۰٬۰۰۰`), Arabic-Indic (`٥٠,٠٠٠`) and Western digits without converting rial/toman or accepting fractions. Menu search treats Arabic and Persian forms of `ک/ك`, `ی/ي`, diacritics and half-spaces as equivalent. A waiter can split several units of the same dish into separate draft lines, each with its own note (for example, two drinks where only one is «بدون یخ»).
+
+A **manager-only stockout/exception path** permits cancelling queued, preparing or ready-but-unserved items with a recorded reason. When *every* item in a table session is cancelled, only the manager may close the session **without a fictitious payment**, again with a reason and audit event. Served items cannot be cancelled through this flow; refunds, partial servings and advanced reconciliation remain out of scope. The original scope document is left chronologically intact; this exception is documented as a late corrective decision.
+
 ### Transaction and security choices
 
 - The runtime DB user `restaurant_runtime` is explicitly **non-superuser, NO BYPASSRLS**, separate from the one-time migrator role.
 - Every restaurant-domain table uses **FORCE ROW LEVEL SECURITY**; without a transaction-local `app.tenant_id`, queries return zero rows. The value comes from the authenticated server session, not from request body.
 - The server serializes writes **using a transaction-scoped advisory lock keyed by table UUID, followed by an active-session row lock**. Two simultaneous new rounds both persist. Two retries with the same idempotency key resolve to the same round. Locking is consistent across order creation, item status, discount and checkout.
 - Explicit role and state-transition validation deny kitchen price changes, waiter payments, cancellation after cooking begins, and closing a session with undelivered food.
+- The `/api/shift` API responds with **role-specific fields**, not just role-specific screens: kitchen never receives bill prices, discount, payment or manager events; waiters do not receive closed receipts or management events; cashiers receive the bill but not the full menu feed. Managers retain audit access.
 - All receipt totals are calculated in the server from integer toman snapshots, not from browser totals or LLM output.
 - Writes require JSON and a matching `Origin`; cookie is `HttpOnly`, `SameSite=Strict`, optionally `Secure`. Secrets are environment variables; they are not committed.
 
@@ -88,6 +95,7 @@ RTL browser (vanilla JS, zero frontend build step)
 | POST | `/api/items/:id/transition` | Role depends on transition | Guarded per-item state transition |
 | POST | `/api/sessions/:id/discount` | Cashier, manager | Set integer discount using expected version |
 | POST | `/api/sessions/:id/checkout` | Cashier, manager | Validate full handoff, register counter payment, close table |
+| POST | `/api/sessions/:id/void` | Manager | Close an all-cancelled session without charging and with a reason |
 | POST | `/api/ai/parse` | Waiter, manager | Optional constrained Persian note parsing, no writes |
 | GET | `/api/health` | Public | DB liveness only, no tenant data |
 
@@ -97,7 +105,7 @@ All write endpoints require `Content-Type: application/json` and an `Origin` mat
 
 The optional **Persian order note parser** only converts a free-form note into menu item IDs, quantities, and per-item notes. It cannot set prices, perform writes, or auto-approve a round. The server provides only current tenant menu IDs/names to an OpenAI-compatible chat endpoint, constrains output and checks IDs against the menu again. Staff review and edit the result before adding it to the draft. Provider timeout/failure returns a visible message; manual selection continues.
 
-To activate: set `AI_API_URL` (a trusted HTTPS `/chat/completions` endpoint), `AI_API_KEY` and `AI_MODEL` in `.env`, then restart. The UI intentionally does **not** mislabel rule-based keyword matching as AI. No key means this optional capability is disabled. Do not store customer identity or payment data in AI prompts.
+To activate: set `AI_API_URL` (a trusted HTTPS `/chat/completions` endpoint), `AI_API_KEY` and `AI_MODEL` in `.env`, then restart. The UI intentionally does **not** mislabel rule-based keyword matching as AI. Manually entered Persian/Arabic-Indic quantities in an AI suggestion are normalized and validated *before* confirmation. No key means this optional capability is disabled. Do not store customer identity or payment data in AI prompts.
 
 ## Verification
 

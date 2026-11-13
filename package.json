@@ -8,10 +8,10 @@
     "start": "node src/server.mjs",
     "migrate": "node scripts/migrate.mjs",
     "seed": "node scripts/seed.mjs",
-    "test": "node --test tests/unit.test.mjs",
+    "test": "node --test tests/unit.test.mjs tests/locale.test.mjs",
     "test:integration": "node --test tests/integration.test.mjs",
     "audit:release": "node scripts/release-audit.mjs",
-    "check": "node --check src/server.mjs && node --check src/db.mjs && node --check src/rate-limit.mjs && node --check tests/integration.test.mjs && node --check src/public/app.js && node --check scripts/migrate.mjs && node --check scripts/seed.mjs && node --check scripts/browser-smoke.mjs && node --check scripts/release-audit.mjs"
+    "check": "node --check src/server.mjs && node --check src/db.mjs && node --check src/rate-limit.mjs && node --check tests/integration.test.mjs && node --check src/public/app.js && node --check src/public/iran-locale.js && node --check tests/locale.test.mjs && node --check scripts/migrate.mjs && node --check scripts/seed.mjs && node --check scripts/browser-smoke.mjs && node --check scripts/release-audit.mjs"
   },
   "engines": {"node": ">=22"},
   "dependencies": {"pg": "^8.16.3"}

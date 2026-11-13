@@ -70,3 +70,8 @@ Corrections introduced during this pass included fixing a CSS cascade conflict t
 **Scope/time honesty:** these additional UX improvements were requested after the initial MVP. The repository's timestamps do not establish the candidate's personal working time; the applicant must disclose a true elapsed work total and any overrun against the initial six-hour cap.
 
 **Browser CI regression found and corrected:** the first browser run with the new custom checkout dialog timed out because the cancellation-reason textarea was still HTML-required while visually hidden. Browser constraint validation prevented the checkout form from submitting, so no payment POST occurred. The code now disables that input for cashier confirmation, and the browser test waits for an actual successful checkout HTTP response before accepting the UI result. This is further evidence that AI-written UI must be exercised end to end.
+
+
+## Further verification and model-assisted corrections
+
+A later real-shift review revealed two previously under-addressed issues: (1) API responses exposed prices/payment metadata to kitchen users even though their screen hid those values; (2) an all-cancelled table could never be released without an incorrect paid receipt. The response projection and manager-only void endpoint were added with negative-role and audit tests. UI localization was supplemented with pure Persian/Arabic digit and keyboard normalization tests. These are engineering interventions driven by exception analysis, not evidence of live banking or real provider-backed AI inference.

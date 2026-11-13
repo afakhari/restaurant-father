@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {HttpError,requireInt,requireUuid,requiredRole,nextItemStatus,parseRound,paymentMethods,sumSubtotal,canCheckout} from './core.mjs';
+import {HttpError,requireInt,requireUuid,requiredRole,nextItemStatus,parseRound,paymentMethods,sumSubtotal,canCheckout,canVoidSession} from './core.mjs';
 import {withTenant,requireSession,lockTable,getSessionItems,logEvent} from './db.mjs';
 
 export async function addRound(user,raw){
@@ -88,5 +88,25 @@ export async function checkout(user,sessionId,body){
   await client.query('UPDATE table_sessions SET closed_at=now(),paid_at=now(),payment_method=$2,paid_amount_toman=$3,version=version+1 WHERE id=$1',[sessionId,body.method,total]);
   await logEvent(client,user,sessionId,'session.checked_out',{subtotal,discount:s.discount_toman,total,method:body.method});
   return {sessionId,total,method:body.method};
+ });
+}
+
+// Closing an entirely cancelled table must not masquerade as a paid bill.
+// A manager alone may release it, with an auditable reason and version check.
+export async function voidSession(user,sessionId,body){
+ requiredRole(user,['manager']);requireUuid(sessionId,'نشست');
+ const expected=requireInt(body?.expectedVersion,1,1000000000,'نسخه');
+ const reason=body?.reason;
+ if(typeof reason!=='string'||reason.trim().length<3||reason.length>200)throw new HttpError(400,'VALIDATION','دلیل بستن میز لغوشده باید بین ۳ تا ۲۰۰ کاراکتر باشد.');
+ return withTenant(user,async client=>{
+  const s0=await requireSession(client,sessionId);await lockTable(client,s0.table_id);
+  const s=await requireSession(client,sessionId,{lock:true});
+  if(s.closed_at)throw new HttpError(409,'CLOSED','این میز قبلاً بسته شده است.');
+  if(s.version!==expected)throw new HttpError(409,'STALE_VERSION','وضعیت میز تغییر کرده است. دوباره بررسی کنید.');
+  const items=await getSessionItems(client,sessionId);
+  if(!canVoidSession(items))throw new HttpError(409,'NOT_ALL_CANCELLED','بستن بدون دریافت وجه فقط زمانی مجاز است که همه اقلام لغو شده باشند.');
+  await client.query('UPDATE table_sessions SET closed_at=now(),version=version+1 WHERE id=$1',[sessionId]);
+  await logEvent(client,user,sessionId,'session.voided',{reason:reason.trim(),cancelledLines:items.length});
+  return {sessionId,voided:true};
  });
 }

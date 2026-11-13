@@ -7,12 +7,12 @@ import {pool,withTenant} from './db.mjs';
 import {login,logout,authenticate,cookie} from './auth.mjs';
 import {HttpError,requiredRole,requireUuid,normalizeAIResult} from './core.mjs';
 import {shiftSnapshot} from './db.mjs';
-import {addRound,transitionItem,setDiscount,checkout} from './operations.mjs';
+import {addRound,transitionItem,setDiscount,checkout,voidSession} from './operations.mjs';
 import {limitLogin} from './rate-limit.mjs';
 
 const featureFlags=()=>({aiEnabled:Boolean(process.env.AI_API_URL&&process.env.AI_API_KEY&&process.env.AI_MODEL)});
 const staticDir=path.join(path.dirname(fileURLToPath(import.meta.url)),'public');
-const staticMap={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css'};
+const staticMap={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css','/iran-locale.js':'iran-locale.js'};
 const mime={'html':'text/html; charset=utf-8','js':'text/javascript; charset=utf-8','css':'text/css; charset=utf-8'};
 const log=(data)=>console.log(JSON.stringify({...data,at:new Date().toISOString()}));
 const answer=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
@@ -78,6 +78,8 @@ export function createServer(){return http.createServer(async(req,res)=>{
     if(tr&&req.method==='POST'){answer(res,200,await transitionItem(actor,tr[1],await readBody(req)));return;}
     const discount=route.match(/^\/api\/sessions\/([0-9a-f-]+)\/discount$/i);
     if(discount&&req.method==='POST'){answer(res,200,await setDiscount(actor,discount[1],await readBody(req)));return;}
+    const voided=route.match(/^\/api\/sessions\/([0-9a-f-]+)\/void$/i);
+    if(voided&&req.method==='POST'){answer(res,200,await voidSession(actor,voided[1],await readBody(req)));return;}
     const pay=route.match(/^\/api\/sessions\/([0-9a-f-]+)\/checkout$/i);
     if(pay&&req.method==='POST'){answer(res,200,await checkout(actor,pay[1],await readBody(req)));return;}
     if(route==='/api/ai/parse'&&req.method==='POST'){answer(res,200,await suggestWithAI(actor,await readBody(req)));return;}
