@@ -119,6 +119,7 @@ Read [DEPLOY.md](DEPLOY.md) before putting this behind HTTPS. Do not deploy with
 
 ## Handover and review
 
+- [docs/UX_BLUEPRINT.fa.md](docs/UX_BLUEPRINT.fa.md): Persian user journey, cross-role service blueprint, screen rationale and UX failure states
 - [SCOPE.md](SCOPE.md): committed *before* implementation
 - [DECISIONS.md](DECISIONS.md): choices, alternatives, accepted costs, and two choices to revisit
 - [AI_USAGE.md](AI_USAGE.md): tools, trade-offs, validation, and rejected AI ideas
