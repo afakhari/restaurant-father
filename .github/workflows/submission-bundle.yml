@@ -1,0 +1,41 @@
+name: Package Abrnac ATS documentation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'SCOPE.md'
+      - 'DECISIONS.md'
+      - 'AI_USAGE.md'
+      - 'HANDOVER.md'
+      - 'README.md'
+      - 'AI_PROMPTS.md'
+      - 'ATS_SUBMISSION.md'
+      - '.github/workflows/submission-bundle.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert all required documents exist
+        run: |
+          set -eu
+          for file in README.md SCOPE.md DECISIONS.md AI_USAGE.md HANDOVER.md AI_PROMPTS.md ATS_SUBMISSION.md; do
+            test -s "$file"
+          done
+      - name: Create upload-ready ZIP
+        run: |
+          mkdir -p dist/abrnac-documentation
+          cp README.md SCOPE.md DECISIONS.md AI_USAGE.md HANDOVER.md AI_PROMPTS.md ATS_SUBMISSION.md dist/abrnac-documentation/
+          cp SECURITY.md DEPLOY.md WALKTHROUGH.md dist/abrnac-documentation/
+          mkdir -p dist/abrnac-documentation/docs
+          cp docs/UX_BLUEPRINT.fa.md dist/abrnac-documentation/docs/
+          cd dist && zip -qr abrnac-project-documentation.zip abrnac-documentation
+      - name: Upload ATS attachments
+        uses: actions/upload-artifact@v4
+        with:
+          name: abrnac-ats-documentation
+          path: dist/abrnac-project-documentation.zip
+          retention-days: 7
