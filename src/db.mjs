@@ -59,7 +59,7 @@ export async function shiftSnapshot(user){return withTenant(user,async client=>{
  const safeRounds=rounds.rows.filter(r=>permitted.has(r.session_id));
  const allowedRounds=new Set(safeRounds.map(r=>r.id));
  const safeItems=items.rows.filter(i=>allowedRounds.has(i.round_id));
- const projectedSessions=(role==='manager'||role==='cashier')?visibleSessions:visibleSessions.map(s=>({id:s.id,branch_id:s.branch_id,table_id:s.table_id,opened_at:s.opened_at,closed_at:s.closed_at,...(role==='waiter'?{discount_toman:s.discount_toman}: {})}));
+ const projectedSessions=(role==='manager'||role==='cashier')?visibleSessions:visibleSessions.map(s=>({id:s.id,branch_id:s.branch_id,table_id:s.table_id,opened_at:s.opened_at,closed_at:s.closed_at,version:s.version,...(role==='waiter'?{discount_toman:s.discount_toman}: {})}));
  const projectedItems=role==='kitchen'?safeItems.map(i=>({id:i.id,round_id:i.round_id,menu_item_id:i.menu_item_id,name_snapshot:i.name_snapshot,quantity:i.quantity,note:i.note,status:i.status,updated_at:i.updated_at})):safeItems;
  const projectedMenu=role==='cashier'?[]:role==='kitchen'?menu.rows.map(m=>({id:m.id,category:m.category,name:m.name,available:m.available})):menu.rows;
  const projectedRounds=role==='kitchen'?safeRounds.map(r=>({id:r.id,session_id:r.session_id,created_at:r.created_at})):safeRounds;

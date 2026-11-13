@@ -56,6 +56,11 @@ test('parallel round additions survive, retries are idempotent, tenant cannot al
  assert.equal(a.status,201);assert.equal(b.status,201);assert.notEqual(a.body.roundId,b.body.roundId);
  const replay=await request('waiter','POST','/api/rounds',payloadA);
  assert.equal(replay.status,201);assert.equal(replay.body.replayed,true);assert.equal(replay.body.roundId,a.body.roundId);
+ const editedQuantity=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],quantity:2}]});
+ assert.equal(editedQuantity.status,409,'same retry key with changed quantity cannot claim a successful save');
+ assert.equal(editedQuantity.body.error.code,'IDEMPOTENCY_CONFLICT');
+ const editedNote=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],note:'بدون یخ'}]});
+ assert.equal(editedNote.status,409,'same retry key with changed note cannot lose a preparation instruction');
  // Reusing the same idempotency key on a different table must NOT silently return the old round.
  const otherTable=A.tables.find(x=>x.id!==t.id);
  const wrongTable=await request('waiter','POST','/api/rounds',{...payloadA,tableId:otherTable.id,expectedSessionId:null});

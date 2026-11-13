@@ -2,22 +2,28 @@ import {randomUUID} from 'node:crypto';
 import {HttpError,requireInt,requireUuid,requiredRole,nextItemStatus,parseRound,paymentMethods,sumSubtotal,canCheckout,canVoidSession} from './core.mjs';
 import {withTenant,requireSession,lockTable,getSessionItems,logEvent} from './db.mjs';
 
+// Idempotency is a *request* identity, not a license to silently accept edited
+// contents. A replay must match the same table AND every individual item/note.
+async function verifiedRoundReplay(client,row,body){
+ if(row.table_id!==body.tableId)throw new HttpError(409,'IDEMPOTENCY_CONFLICT','این شناسه سفارش قبلاً برای میز دیگری استفاده شده است.');
+ const result=await client.query('SELECT menu_item_id,quantity,note FROM order_items WHERE round_id=$1',[row.id]);
+ const normalize=items=>items.map(x=>JSON.stringify([x.menuItemId??x.menu_item_id,Number(x.quantity),String(x.note??'').trim()])).sort();
+ if(JSON.stringify(normalize(result.rows))!==JSON.stringify(normalize(body.items))){
+  throw new HttpError(409,'IDEMPOTENCY_CONFLICT','این درخواست قبلاً با اقلام یا توضیحات متفاوت ثبت شده است. سفارش جاری را بررسی کنید و درخواست تازه‌ای ثبت کنید.');
+ }
+ return {roundId:row.id,sessionId:row.session_id,replayed:true};
+}
+
 export async function addRound(user,raw){
  requiredRole(user,['waiter','manager']);const body=parseRound(raw);
  return withTenant(user,async client=>{
    // Same key already completed: returning it is safe even if the table was checked out since.
    let previous=await client.query('SELECT r.id,r.session_id,s.table_id FROM order_rounds r JOIN table_sessions s ON s.id=r.session_id WHERE r.created_by=$1 AND r.idempotency_key=$2',[user.id,body.idempotencyKey]);
-   if(previous.rowCount){
-     if(previous.rows[0].table_id!==body.tableId)throw new HttpError(409,'IDEMPOTENCY_CONFLICT','کلید این درخواست قبلاً برای میز دیگری استفاده شده است.');
-     return {roundId:previous.rows[0].id,sessionId:previous.rows[0].session_id,replayed:true};
-   }
+   if(previous.rowCount)return verifiedRoundReplay(client,previous.rows[0],body);
    const table=await lockTable(client,body.tableId);
    // Recheck after serializing on the table to handle simultaneous retries of the same key.
    previous=await client.query('SELECT r.id,r.session_id,s.table_id FROM order_rounds r JOIN table_sessions s ON s.id=r.session_id WHERE r.created_by=$1 AND r.idempotency_key=$2',[user.id,body.idempotencyKey]);
-   if(previous.rowCount){
-     if(previous.rows[0].table_id!==table.id)throw new HttpError(409,'IDEMPOTENCY_CONFLICT','کلید این درخواست قبلاً برای میز دیگری استفاده شده است.');
-     return {roundId:previous.rows[0].id,sessionId:previous.rows[0].session_id,replayed:true};
-   }
+   if(previous.rowCount)return verifiedRoundReplay(client,previous.rows[0],body);
    const existing=await client.query('SELECT id FROM table_sessions WHERE table_id=$1 AND closed_at IS NULL FOR UPDATE',[table.id]);
    const sessionId=existing.rows[0]?.id??null;
    if(body.expectedSessionId!==sessionId)throw new HttpError(409,'STALE_SESSION','وضعیت میز تغییر کرده است. صفحه را تازه کنید.');

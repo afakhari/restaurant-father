@@ -59,3 +59,7 @@ The current interface asks for explicit confirmation before deleting an unsubmit
 ## 5. Cancellation/void integrity
 
 A fully cancelled table is closed only by a manager and only with a logged reason, under the same transaction/advisory lock and `expectedVersion` as checkout. It creates no `paid_at`, `paid_amount_toman` or `payment_method`. A kitchen worker cannot cancel a started dish, and a cashier cannot void a table. No refund is implied for an already served dish.
+
+**Idempotency content integrity:** replay keys must match the same table **and** an equivalent set of item IDs, quantities and separate preparation notes. Reusing a key with edited contents returns HTTP 409 rather than pretending that the edited order was saved. Concurrency tests cover changed quantities and notes.
+
+**Contract compatibility:** active-session response projections retain a nonsensitive `version` counter for waiter and kitchen actions, so clients can detect stale operations without revealing payment fields.
