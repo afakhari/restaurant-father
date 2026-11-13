@@ -32,16 +32,24 @@ export async function getSessionItems(client,sessionId){
 export async function logEvent(client,user,sessionId,eventType,payload={}){
   await client.query('INSERT INTO order_events(restaurant_id,session_id,actor_id,event_type,payload) VALUES($1,$2,$3,$4,$5)',[user.restaurantId,sessionId,user.id,eventType,JSON.stringify(payload)]);
 }
+// Return *all* open sessions and their complete rounds/items. Historical data is
+// bounded separately; a global newest-N LIMIT must not hide older open tickets.
 export async function shiftSnapshot(user){return withTenant(user,async client=>{
- const [rests,branches,tables,menu,sessions,rounds,items,events]=await Promise.all([
+ const [rests,branches,tables,menu,open,history]=await Promise.all([
    client.query('SELECT id,name,slug FROM restaurants'),
    client.query('SELECT id,restaurant_id,name,address FROM branches ORDER BY name'),
    client.query('SELECT id,restaurant_id,branch_id,number,seats FROM dining_tables ORDER BY number'),
    client.query('SELECT id,category,name,description,price_toman,available FROM menu_items ORDER BY sort_order,name'),
-   client.query('SELECT * FROM table_sessions ORDER BY opened_at DESC LIMIT 75'),
-   client.query('SELECT id,session_id,created_by,created_at FROM order_rounds ORDER BY created_at DESC LIMIT 250'),
-   client.query(`SELECT oi.id,oi.round_id,oi.menu_item_id,oi.name_snapshot,oi.quantity,oi.unit_price_toman,oi.note,oi.status,oi.updated_at FROM order_items oi ORDER BY oi.updated_at DESC LIMIT 1000`),
+   client.query('SELECT * FROM table_sessions WHERE closed_at IS NULL ORDER BY opened_at ASC'),
+   client.query('SELECT * FROM table_sessions WHERE closed_at IS NOT NULL ORDER BY closed_at DESC LIMIT 20')
+ ]);
+ const sessions=[...open.rows,...history.rows],sessionIds=sessions.map(x=>x.id);
+ const [rounds,items,events]=await Promise.all([
+   client.query('SELECT id,session_id,created_by,created_at FROM order_rounds WHERE session_id=ANY($1::uuid[]) ORDER BY created_at DESC',[sessionIds]),
+   client.query(`SELECT oi.id,oi.round_id,oi.menu_item_id,oi.name_snapshot,oi.quantity,oi.unit_price_toman,oi.note,oi.status,oi.updated_at
+     FROM order_items oi JOIN order_rounds r ON r.id=oi.round_id AND r.restaurant_id=oi.restaurant_id
+     WHERE r.session_id=ANY($1::uuid[]) ORDER BY oi.updated_at DESC`,[sessionIds]),
    client.query('SELECT id,session_id,event_type,payload,created_at FROM order_events ORDER BY created_at DESC LIMIT 60')
  ]);
- return {restaurant:rests.rows[0]??null,branches:branches.rows,tables:tables.rows,menu:menu.rows,sessions:sessions.rows,rounds:rounds.rows,items:items.rows,events:events.rows,me:{id:user.id,name:user.name,role:user.role,restaurantId:user.restaurantId}};
+ return {restaurant:rests.rows[0]??null,branches:branches.rows,tables:tables.rows,menu:menu.rows,sessions,rounds:rounds.rows,items:items.rows,events:events.rows,me:{id:user.id,name:user.name,role:user.role,restaurantId:user.restaurantId}};
  });}

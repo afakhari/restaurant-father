@@ -55,3 +55,7 @@ A subsequent user request, «تمامی اقدامات لازم را انجام 
 Provider call is optional and server-side, with an HTTPS endpoint, timeout, low temperature, at most 300 output tokens and an explicitly bounded menu subset. User notes are untrusted content; the prompt instructs the provider to return JSON only, but prompt text is **not the security boundary**. A second server-side parser discards unknown menu IDs, invalid counts and extraneous properties. A cashier or kitchen action is never delegated to AI. Provider errors fail visibly and allow manual ordering. This bounded design controls the common hallucination/cost/latency risks but has not been independently adversarially evaluated.
 
 An export of the actual user instructions and the runtime AI system prompt for the ATS prompt field is in [AI_PROMPTS.md](AI_PROMPTS.md). Browser recordings, if generated in CI, are explicitly labeled automated and do not imply candidate-narrated video.
+
+## Follow-up verification and corrections
+
+A subsequent source review identified that the initial `/api/shift` global LIMIT clauses could omit active orders after sufficient history. The query was changed to always include open sessions and their associated rounds/items, while bounding closed history separately. A single-instance login throttle was added with explicit limits. Additional automated integration tests exercise AI being unavailable and a local simulated provider; these do not claim a real AI API has been used. Actual time spent and any overrun of the challenge cap must be disclosed by the candidate.

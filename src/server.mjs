@@ -8,6 +8,7 @@ import {login,logout,authenticate,cookie} from './auth.mjs';
 import {HttpError,requiredRole,requireUuid,normalizeAIResult} from './core.mjs';
 import {shiftSnapshot} from './db.mjs';
 import {addRound,transitionItem,setDiscount,checkout} from './operations.mjs';
+import {limitLogin} from './rate-limit.mjs';
 
 const staticDir=path.join(path.dirname(fileURLToPath(import.meta.url)),'public');
 const staticMap={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css'};
@@ -63,7 +64,7 @@ export function createServer(){return http.createServer(async(req,res)=>{
   if(route==='/api/health'&&req.method==='GET'){await pool.query('SELECT 1');answer(res,200,{ok:true});return;}
   if(route.startsWith('/api/')&&req.method==='POST')csrf(req);
   if(route==='/api/auth/login'&&req.method==='POST'){
-    const body=await readBody(req);const result=await login(body.email,body.password);
+    const body=await readBody(req);limitLogin(req,body?.email);const result=await login(body.email,body.password);
     res.setHeader('Set-Cookie',cookie('shiftyar_session',result.token));answer(res,200,{me:result.user});return;
   }
   if(route==='/api/auth/logout'&&req.method==='POST'){await logout(req);res.setHeader('Set-Cookie',cookie('shiftyar_session','',{clear:true}));answer(res,200,{ok:true});return;}

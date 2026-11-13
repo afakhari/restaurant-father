@@ -1,4 +1,4 @@
-# SCOPE — ShiftYar (شیفت‌یار) / Abrnac assessment
+# SCOPE — ShiftYar (شیفت‌یار)
 
 **Agreement date:** 2026-11-13. **Status:** written before product implementation. **Time cap:** 6 hours active engineering work. **Customer:** one Iranian full-service café/restaurant. **Product type:** future multi-tenant SaaS with branches.
 

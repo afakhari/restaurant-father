@@ -132,6 +132,10 @@ Licensed under the repository's existing MIT LICENSE.
 
 ## Browser UX evidence (real app, automated)
 
-On pull requests affecting the actual UI, the [Browser UX workflow](.github/workflows/browser-evidence.yml) starts a real PostgreSQL 16 instance and Node HTTP application, then uses Chromium/Playwright to exercise the flow via **actual employee screens**, saving screenshots and an automatic browser video to the GitHub Actions artifact `real-app-browser-evidence`. It covers waiter (two rounds on table 8), kitchen start/ready, waiter served, cashier discount and checkout, independent tenant and a 390px mobile viewport. The video is **automated acceptance evidence, not the recorded candidate explanation** requested by Abrnac.
+On pull requests affecting the actual UI, the [Browser UX workflow](.github/workflows/browser-evidence.yml) starts a real PostgreSQL 16 instance and Node HTTP application, then uses Chromium/Playwright to exercise the flow via **actual employee screens**, saving screenshots and an automatic browser video to the GitHub Actions artifact `real-app-browser-evidence`. It covers waiter (two rounds on table 8), kitchen start/ready, waiter served, cashier discount and checkout, independent tenant and a 390px mobile viewport. The video is **automated acceptance evidence, not the recorded candidate explanation** requested by ShiftYar.
 
-For the ATS final form and exact prompt disclosure, see [ATS_SUBMISSION.md](ATS_SUBMISSION.md) and [AI_PROMPTS.md](AI_PROMPTS.md). Do not submit without a verified live site, credentials, and narrated walkthrough.
+For the final handover form and exact prompt disclosure, see [SUBMISSION_CHECKLIST.md](SUBMISSION_CHECKLIST.md) and [AI_PROMPTS.md](AI_PROMPTS.md). Do not submit without a verified live site, credentials, and narrated walkthrough.
+
+## Snapshot consistency and public-login protection
+
+The shift snapshot now reads **every open table session** and all its rounds/items; only closed history is limited to 20 latest sessions. This prevents a busy restaurant from losing an older active ticket due to a global newest-N limit. The demo login endpoint has a small in-memory IP+account throttle (8 attempts per account+IP, 100 per IP per 15 minutes); hosting still needs distributed edge limits and monitoring. The integration suite covers absent-provider and stub-provider AI paths; a simulated provider **does not** prove that a paid/production model is configured or accurate.

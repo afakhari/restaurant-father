@@ -1,8 +1,9 @@
 import test,{after,before} from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import http from 'node:http';
 import {createServer} from '../src/server.mjs';
-import {pool} from '../src/db.mjs';
+import {pool,withTenant} from '../src/db.mjs';
 
 let server,origin;
 const creds={waiter:'waiter@narenj.demo',kitchen:'kitchen@narenj.demo',cashier:'cashier@narenj.demo',manager:'manager@narenj.demo',other:'manager@darband.demo'};
@@ -97,4 +98,71 @@ test('complete user workflow: waiter -> kitchen -> waiter serves -> cashier disc
 test('CSRF origin mismatch fails closed',async()=>{
  const response=await fetch(`${origin}/api/rounds`,{method:'POST',headers:{origin:'https://attacker.example','content-type':'application/json',cookie:cookies.waiter},body:'{}'});
  assert.equal(response.status,403);
+});
+
+
+test('login endpoint throttles repeated attempts without exposing account existence',async()=>{
+ const email='no-such-person@example.invalid';
+ for(let i=0;i<8;i++){
+  const r=await fetch(`${origin}/api/auth/login`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({email,password:'incorrect'})});
+  assert.equal(r.status,401);
+ }
+ const blocked=await fetch(`${origin}/api/auth/login`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({email,password:'incorrect'})});
+ assert.equal(blocked.status,429);
+});
+
+test('AI endpoint fails visibly when provider is not configured, without blocking manual order entry',async()=>{
+ const before=process.env.AI_API_URL;const key=process.env.AI_API_KEY;const model=process.env.AI_MODEL;
+ delete process.env.AI_API_URL;delete process.env.AI_API_KEY;delete process.env.AI_MODEL;
+ try{
+  const result=await request('waiter','POST','/api/ai/parse',{note:'دو عدد لاته و یک آب معدنی'});
+  assert.equal(result.status,503);assert.equal(result.body.error.code,'AI_UNAVAILABLE');
+  const data=await shift('waiter');assert.equal(data.status,200);
+ }finally{
+  if(before!==undefined)process.env.AI_API_URL=before;
+  if(key!==undefined)process.env.AI_API_KEY=key;
+  if(model!==undefined)process.env.AI_MODEL=model;
+ }
+});
+
+test('AI response is constrained to current restaurant menu and requires staff confirmation',async()=>{
+ const menu=(await shift('waiter')).body.menu;
+ const available=menu.find(x=>x.available);
+ const remote=http.createServer((req,res)=>{
+  res.setHeader('Content-Type','application/json');
+  res.end(JSON.stringify({choices:[{message:{content:JSON.stringify({items:[
+   {menuItemId:available.id,quantity:2,note:'یکی کم‌شیر'},
+   {menuItemId:crypto.randomUUID(),quantity:1,note:'غذای خارجی'}
+  ],unmatched:'نامشخص'})}}]}));
+ });
+ await new Promise(resolve=>remote.listen(0,'127.0.0.1',resolve));
+ const saved=[process.env.AI_API_URL,process.env.AI_API_KEY,process.env.AI_MODEL];
+ process.env.AI_API_URL=`http://127.0.0.1:${remote.address().port}`;
+ process.env.AI_API_KEY='test-key';process.env.AI_MODEL='fake-test-only';
+ try{
+  const r=await request('waiter','POST','/api/ai/parse',{note:'دو تا غذا از منو یکی کم‌شیر'});
+  assert.equal(r.status,200);assert.equal(r.body.requiresConfirmation,true);
+  assert.deepEqual(r.body.items,[{menuItemId:available.id,quantity:2,note:'یکی کم‌شیر'}]);
+  assert.equal(r.body.unmatched,'نامشخص');
+ }finally{
+  [process.env.AI_API_URL,process.env.AI_API_KEY,process.env.AI_MODEL]=saved;
+  for(const name of ['AI_API_URL','AI_API_KEY','AI_MODEL'])if(process.env[name]==='undefined')delete process.env[name];
+  await new Promise(resolve=>remote.close(resolve));
+ }
+});
+
+
+test('busy historical traffic never removes an older open table from the live shift snapshot',async()=>{
+ const original=(await shift('waiter')).body;
+ const active=original.sessions.find(x=>!x.closed_at);assert.ok(active);
+ const actor={id:original.me.id,restaurantId:original.me.restaurantId,role:original.me.role};
+ await withTenant(actor,client=>client.query(`INSERT INTO table_sessions(restaurant_id,branch_id,table_id,opened_by,opened_at,closed_at)
+   SELECT $1,$2,$3,$4,now()-interval '2 hour',now() FROM generate_series(1,85)`,
+   [actor.restaurantId,active.branch_id,active.table_id,actor.id]));
+ const after=(await shift('waiter')).body;
+ const retained=after.sessions.find(x=>x.id===active.id);
+ assert.ok(retained&&!retained.closed_at,'an older open session must remain visible');
+ assert.ok(after.rounds.some(x=>x.session_id===active.id),'active rounds must remain loaded');
+ assert.ok(after.items.some(x=>after.rounds.some(r=>r.session_id===active.id&&r.id===x.round_id)),'active order items must remain loaded');
+ assert.ok(after.sessions.filter(x=>x.closed_at).length<=20,'closed history must be bounded independently');
 });
