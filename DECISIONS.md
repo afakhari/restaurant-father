@@ -93,3 +93,10 @@ Each decision documents **decision / why / alternative / accepted trade-off**, r
 - **Why:** Iranian staff may use heterogeneous mobile keyboards; manual correction is costly during a shift.
 - **Alternative:** Require ASCII digits and exact Persian spelling everywhere.
 - **Trade-off:** Dedicated input parsing and tests; no automatic currency inference or fractional money is permitted.
+
+
+## D-14 — Reject edited retries rather than silently reuse a prior round
+- **Decision:** Idempotency replay verifies the original item IDs, quantities and notes in a canonical order; changed payloads return 409 and require the waiter to review the table and submit a fresh round.
+- **Why:** The server may commit an order while its network response is lost. A subsequent edited retry must not report success for an older, different order.
+- **Alternative:** Deduplicate solely by actor-provided idempotency key, regardless of content.
+- **Trade-off:** One small indexed lookup of original order lines on replay; bounded to twelve lines per round.

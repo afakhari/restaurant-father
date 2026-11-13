@@ -6,8 +6,8 @@ This project was produced with assistance from **OpenAI ChatGPT (GPT-6)** and th
 
 - **ChatGPT / GPT-6:** compared existing open-source restaurant products, proposed product scope, mapped Iranian UX/service workflow, drafted the database schema, HTTP API, RTL UI, seed, test scenarios, security review and documentation. It generated a substantial share of implementation code. Human review before submission is still needed.
 - **GitHub connector:** searched source repositories, inspected representative order/kitchen/cashier code, verified target repository permissions, created a feature branch and committed `SCOPE.md` **before implementation**, and prepared product changes as a reviewable PR.
-- **Local Node.js:** executed `node --check` and six pure unit tests in `node --test`; outputs were examined.
-- **Automated PostgreSQL tests:** GitHub Actions provisioned PostgreSQL 16 and ran migration, seed, six unit tests, and five real integration tests **successfully** on `main` (run `43479468638`). The tests were not locally executed with PostgreSQL in the authoring environment, which lacks a Docker daemon.
+- **Local Node.js:** executed `node --check` and the initial six pure unit tests, later extended to nine, in `node --test`; outputs were examined.
+- **Automated PostgreSQL tests:** GitHub Actions provisioned PostgreSQL 16 and ran migration, seed and the original six unit/five integration tests **successfully** on `main` (run `43479468638`); a subsequent review expanded the suite to nine unit and eleven integration tests (PR #7 CI run `43498681600`). The tests were not locally executed with PostgreSQL in the authoring environment, which lacks a Docker daemon.
 
 ## What AI genuinely accelerated
 
@@ -31,8 +31,8 @@ Discovery of existing interaction patterns (table sessions, per-item KDS transit
 ## How generated code was checked
 
 - Verified JSON body parsing, UUID/quantity bounds, price snapshot trust boundary, state transitions, discounts, checkout guards, cookie flags, origin checks and tenant scoping in source.
-- Ran local JS syntax checks and unit tests for domain rules, including no client price trust, legal/illegal item transitions, bill totals and AI menu ID validation. Unit tests: **6/6 passed in the authoring environment**.
-- Wrote a DB integration suite and CI workflow for independent tenant data, direct RLS no-context checks, concurrent round submissions, duplicate retry, role isolation, full order-to-checkout and CSRF. **GitHub Actions confirmed all 5/5 integration tests passing** on the merged `main` branch (run `43479468638`), in addition to 6/6 unit tests.
+- Ran local JS syntax checks and unit tests for domain rules, including no client price trust, legal/illegal item transitions, bill totals and AI menu ID validation. Current local unit tests: **9/9 passed in the authoring environment**.
+- Wrote a DB integration suite and CI workflow for independent tenant data, direct RLS no-context checks, concurrent round submissions, duplicate retry, role isolation, full order-to-checkout and CSRF. **GitHub Actions confirmed 11/11 integration and 9/9 unit tests passing** on the review branch (run `43498681600`). The original main branch passed 5/5 integration and 6/6 unit tests (run `43479468638`); the additions have not yet been deployed to a public host.
 - No hand-run multi-device test, provider-side injection red-team, real banking test, external penetration test or full load test was completed. Those limitations are not hidden.
 
 ## Architecture decisions that came from our product reasoning
@@ -75,3 +75,10 @@ Corrections introduced during this pass included fixing a CSS cascade conflict t
 ## Further verification and model-assisted corrections
 
 A later real-shift review revealed two previously under-addressed issues: (1) API responses exposed prices/payment metadata to kitchen users even though their screen hid those values; (2) an all-cancelled table could never be released without an incorrect paid receipt. The response projection and manager-only void endpoint were added with negative-role and audit tests. UI localization was supplemented with pure Persian/Arabic digit and keyboard normalization tests. These are engineering interventions driven by exception analysis, not evidence of live banking or real provider-backed AI inference.
+
+
+## Latest edge-case correction and provenance
+
+A subsequent review found that reusing an idempotency key on the *same table* with **different item quantities or notes** could return a replay success for the old order, silently discarding an edited retry after a network failure. The server now compares canonical item/quantity/note contents and returns HTTP 409 on a mismatch. The client retains the draft and tells staff to inspect the table before submitting a new round. This was checked with a new PostgreSQL negative test.
+
+The same review tightened role-specific JSON responses, added manager-only fully cancelled table release (with no fake payment), and introduced tests for localized Persian/Arabic discount digits. These decisions were informed by AI-assisted analysis and then checked with local unit tests and GitHub Actions, not through direct observation of a real restaurant shift.

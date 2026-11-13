@@ -119,7 +119,7 @@ SEED_DEMO=true DEMO_PASSWORD='Demo-Shift-1405!' npm run seed
 npm run test:integration
 ```
 
-Integration tests include a complete waiter → kitchen → waiter → cashier sequence; concurrent rounds; retry idempotency; role boundaries; RLS without tenant context; cross-tenant known-ID requests; and CSRF origin mismatch. The GitHub Actions workflow provisions Postgres 16 to run these checks. **Local limitation of the authoring environment:** no Docker daemon or npm registry access, so unit tests and syntax checks were run locally; real DB integration must be confirmed by CI. A passing CI status is required before calling this production-tested.
+The current suite has **9 unit tests** (including Persian/Arabic input parsing) and **11 PostgreSQL integration tests**. Integration coverage includes a complete waiter → kitchen → waiter → cashier sequence; concurrent rounds; edited retry idempotency (quantity/note mismatches); role-specific response privacy; manager-only cancellation/void with no fake payment; RLS without tenant context; cross-tenant known-ID requests; and CSRF origin mismatch. The GitHub Actions workflow provisions Postgres 16 to run these checks. **Local limitation of the authoring environment:** no Docker daemon or npm registry access, so unit tests and syntax checks were run locally; real DB integration must be confirmed by CI. A passing CI status is required before calling this production-tested.
 
 ## Production deployment
 
