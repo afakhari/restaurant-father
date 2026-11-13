@@ -56,6 +56,7 @@ try {
   await snap('01-login');
   await login('waiter@narenj.demo');
   await page.locator('.table-tile').first().waitFor();
+  assert.ok((await page.locator('.table-tile').count()) >= 8, 'Initial demo must open busy central branch, not an empty branch');
   await snap('02-waiter-hall');
   await chooseTable(8);
   await sendRound('چای زعفرانی');
