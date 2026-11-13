@@ -7,7 +7,7 @@ This project was produced with assistance from **OpenAI ChatGPT (GPT-6)** and th
 - **ChatGPT / GPT-6:** compared existing open-source restaurant products, proposed product scope, mapped Iranian UX/service workflow, drafted the database schema, HTTP API, RTL UI, seed, test scenarios, security review and documentation. It generated a substantial share of implementation code. Human review before submission is still needed.
 - **GitHub connector:** searched source repositories, inspected representative order/kitchen/cashier code, verified target repository permissions, created a feature branch and committed `SCOPE.md` **before implementation**, and prepared product changes as a reviewable PR.
 - **Local Node.js:** executed `node --check` and six pure unit tests in `node --test`; outputs were examined.
-- **Automated PostgreSQL tests:** GitHub Actions provisioned PostgreSQL 16 and ran migration, seed, six unit tests, and five real integration tests **successfully** on `main` (run `43479468638`). The tests were not locally executed with PostgreSQL in the authoring environment, which lacks a Docker daemon.
+- **Automated PostgreSQL tests:** GitHub Actions provisioned PostgreSQL 16 and ran migration, seed, six unit tests and nine real integration tests **successfully** on `main` (run `43488496326`). The tests were not locally executed with PostgreSQL in the authoring environment, which lacks a Docker daemon.
 
 ## What AI genuinely accelerated
 
@@ -32,7 +32,7 @@ Discovery of existing interaction patterns (table sessions, per-item KDS transit
 
 - Verified JSON body parsing, UUID/quantity bounds, price snapshot trust boundary, state transitions, discounts, checkout guards, cookie flags, origin checks and tenant scoping in source.
 - Ran local JS syntax checks and unit tests for domain rules, including no client price trust, legal/illegal item transitions, bill totals and AI menu ID validation. Unit tests: **6/6 passed in the authoring environment**.
-- Wrote a DB integration suite and CI workflow for independent tenant data, direct RLS no-context checks, concurrent round submissions, duplicate retry, role isolation, full order-to-checkout and CSRF. **GitHub Actions confirmed all 5/5 integration tests passing** on the merged `main` branch (run `43479468638`), in addition to 6/6 unit tests.
+- Wrote a DB integration suite and CI workflow for independent tenant data, direct RLS no-context checks, concurrent round submissions, duplicate retry, role isolation, full order-to-checkout and CSRF. **GitHub Actions confirmed all 9/9 integration tests passing** on the latest `main` branch (run `43488496326`), in addition to 6/6 unit tests.
 - No hand-run multi-device test, provider-side injection red-team, real banking test, external penetration test or full load test was completed. Those limitations are not hidden.
 
 ## Architecture decisions that came from our product reasoning
@@ -58,4 +58,4 @@ An export of the actual user instructions and the runtime AI system prompt for t
 
 ## Follow-up verification and corrections
 
-A subsequent source review identified that the initial `/api/shift` global LIMIT clauses could omit active orders after sufficient history. The query was changed to always include open sessions and their associated rounds/items, while bounding closed history separately. A single-instance login throttle was added with explicit limits. Additional automated integration tests exercise AI being unavailable and a local simulated provider; these do not claim a real AI API has been used. Actual time spent and any overrun of the challenge cap must be disclosed by the candidate.
+A subsequent source review identified that the initial `/api/shift` global LIMIT clauses could omit active orders after sufficient history. The query was changed to always include open sessions and their associated rounds/items, while bounding closed history separately. A single-instance login throttle was added with explicit limits. Additional automated integration tests exercise login throttling, older active tickets after 85 newer historical records, AI being unavailable and a local simulated provider; these do not claim a real AI API has been used. Actual time spent and any overrun of the challenge cap must be disclosed by the candidate.
