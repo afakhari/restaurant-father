@@ -47,6 +47,15 @@ docker compose up --build
 
 Open **http://localhost:3000**. The Compose stack starts PostgreSQL 16, applies migrations with an administrative database user, creates the restricted runtime user, and seeds two fictitious restaurants. Data persist in the `shiftyar_pgdata` Docker volume. The local defaults are **for development only**, not internet deployment.
 
+To verify startup, open **http://localhost:3000/api/health** (expect `{"ok":true}`). The `app` and `postgres` services should be running, while the one-time `migrate` service should have **exited with code 0**:
+
+```bash
+docker compose ps -a
+docker compose logs --tail=100 migrate app
+```
+
+**On a slow machine or after an interrupted first boot:** use `docker compose up --build -d` again after updating the repository. The PostgreSQL health check uses TCP so it cannot mistake the image's temporary Unix-socket-only initialization server for the final ready database. If startup still fails, inspect the logs above before resetting anything. **Do not run `docker compose down -v` merely to retry**, because `-v` deletes all local demo data.
+
 To supply your own local secrets, copy `.env.example` to `.env` and change the relevant values before starting. To **delete all local demo data and start over**:
 
 ```bash
