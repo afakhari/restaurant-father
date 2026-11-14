@@ -111,6 +111,29 @@ try {
    assert.equal(await search.getAttribute('data-identity'),'stable','Resetting category should not remount search');
    await snap('02-waiter-hall');
   await chooseTable(8);
+  // Rule-based demo must be described honestly and remain usable without a paid provider.
+  await page.locator('#ai-note').fill('دو تا لاته، یکی کم‌شیر و نوشابه');
+  await page.locator('[data-action="ai-parse"]').click();
+  await page.locator('.ai-review-line').first().waitFor();
+  assert.match(await page.locator('.ai-mode').innerText(),/تطبیق ساده|مدل زبانی/);
+  assert.equal(await page.locator('.ai-review-line').count(),2,'Different drink preparation notes need different rows');
+  assert.equal(await page.locator('.ai-unresolved-item').count(),1,'Missing menu items must be shown explicitly');
+  assert.equal(await page.locator('[data-action="ai-apply"]').isDisabled(),true,'Unresolved items need explicit resolution');
+  const noteValues=await page.locator('[data-ai-note]').evaluateAll(els=>els.map(x=>x.value));
+  assert.equal(noteValues.filter(Boolean).length,1,'One note must not be applied to both drinks');
+  await page.locator('[data-action="ai-dismiss"]').click();
+  await page.locator('[data-action="ai-apply"]').click();
+  assert.equal(await page.locator('.draft-line').count(),2,'Confirmed suggestions must become separate draft lines');
+  assert.equal(await page.locator('.current-item').count(),0,'Proposal acceptance must not write any order');
+  await page.locator('.draft-line [data-action="remove-draft"]').first().click();
+  await page.locator('.draft-line [data-action="remove-draft"]').first().click();
+  // A text edit invalidates the old proposal and requires a fresh analysis.
+  await page.locator('#ai-note').fill('یک چیزکیک');
+  await page.locator('[data-action="ai-parse"]').click();
+  await page.locator('.ai-review-line').first().waitFor();
+  await page.locator('#ai-note').fill('دو چیزکیک');
+  assert.equal(await page.locator('.ai-review-line').count(),0,'Changing source text invalidates a stale suggestion');
+  await page.locator('[data-action="ai-clear"]').click();
   await sendRound('چای زعفرانی');
   await sendRound('لیموناد'); // Two rounds in the SAME table session.
   const rounds = await page.locator('.round-sep').count();
