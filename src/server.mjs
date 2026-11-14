@@ -13,6 +13,7 @@ import {limitLogin} from './rate-limit.mjs';
 const featureFlags=()=>({aiEnabled:Boolean(process.env.AI_API_URL&&process.env.AI_API_KEY&&process.env.AI_MODEL)});
 const staticDir=path.join(path.dirname(fileURLToPath(import.meta.url)),'public');
 const staticMap={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css','/iran-locale.js':'iran-locale.js'};
+const fontFiles={'/fonts/vazirmatn-arabic.woff2':'vazirmatn-arabic-wght-normal.woff2','/fonts/vazirmatn-latin.woff2':'vazirmatn-latin-wght-normal.woff2'};
 const mime={'html':'text/html; charset=utf-8','js':'text/javascript; charset=utf-8','css':'text/css; charset=utf-8'};
 const log=(data)=>console.log(JSON.stringify({...data,at:new Date().toISOString()}));
 const answer=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
@@ -61,6 +62,12 @@ export function createServer(){return http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');const route=url.pathname;
   if(req.method==='GET'&&staticMap[route]){
     const name=staticMap[route];const data=await fs.readFile(path.join(staticDir,name));res.writeHead(200,{'Content-Type':mime[name.split('.').at(-1)],'Cache-Control':'no-cache'});res.end(data);return;
+  }
+  if(req.method==='GET'&&fontFiles[route]){
+    const file=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','node_modules','@fontsource-variable','vazirmatn','files',fontFiles[route]);
+    const data=await fs.readFile(file);
+    res.writeHead(200,{'Content-Type':'font/woff2','Cache-Control':'public, max-age=604800','X-Content-Type-Options':'nosniff'});
+    res.end(data);return;
   }
   if(route==='/api/health'&&req.method==='GET'){await pool.query('SELECT 1');answer(res,200,{ok:true});return;}
   if(route.startsWith('/api/')&&req.method==='POST')csrf(req);
