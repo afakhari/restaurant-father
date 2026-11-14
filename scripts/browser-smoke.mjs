@@ -31,6 +31,9 @@ const login = async (email) => {
   await page.locator('.main-nav').waitFor({ state: 'visible' });
 };
 const logout = async () => {
+  // A 200 HTTP response may precede the app's refresh/finally sequence.
+  // Wait for the operation guard to release before pressing Logout.
+  await page.locator('#app.app-busy').waitFor({ state: 'hidden' });
   await page.locator('[data-action="logout"]').click();
   await page.locator('#login-form').waitFor({ state: 'visible' });
 };
