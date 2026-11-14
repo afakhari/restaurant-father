@@ -29,7 +29,7 @@ For a trusted OpenAI-compatible API set `AI_API_URL` (HTTPS full chat-completion
 
 ### Natural-language order intake release gate
 
-Without AI credentials the user-facing feature remains functional as explicitly labeled, limited **rule-based menu matching**; no provider charges are incurred. The new \`POST /api/ai/order-suggestions\` checks employee role, tenant, table and active session; validates output and never writes an order. Final \`POST /api/rounds\` rechecks availability and optional expected price in its DB transaction.
+Without AI credentials the user-facing feature remains functional as explicitly labeled, limited **rule-based menu matching**; no provider charges are incurred. The new `POST /api/ai/order-suggestions` checks employee role, tenant, table and active session; validates output and never writes an order. Final `POST /api/rounds` rechecks availability and optional expected price in its DB transaction.
 
 Before configuring a real provider, verify that its contractual and regional terms permit serving the intended Iranian market, establish an explicit billing cap, test its Persian extraction behavior against the golden cases and review its data-retention policy. Do not treat a Frankfurt server address as permission to supply a restricted service. The current in-memory limit is 20 suggestion calls per staff member per five minutes per instance: horizontally scaled hosting requires a shared limiter and cost quota. The endpoint rejects obvious phone/card details but this is not a complete DLP system; staff must avoid entering customer personal data. Never store keys in the repository or frontend, and never claim AI is live merely because the UI can produce deterministic suggestions.
 
