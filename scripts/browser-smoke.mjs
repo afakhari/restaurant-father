@@ -60,7 +60,9 @@ try {
     const style = getComputedStyle(document.body);
     const root = getComputedStyle(document.documentElement);
     const luminance = (hex) => {
-      const rgb = hex.match(/[0-9a-f]{2}/gi)?.slice(0, 3).map(x => parseInt(x, 16) / 255);
+      const raw = String(hex).trim().replace(/^#/, '');
+      const full = raw.length === 3 ? [...raw].map(x => x + x).join('') : raw;
+      const rgb = full.match(/[0-9a-f]{2}/gi)?.slice(0, 3).map(x => parseInt(x, 16) / 255);
       if (!rgb || rgb.length !== 3) return 0;
       return rgb.map(x => x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4)
         .reduce((sum, x, i) => sum + x * [.2126, .7152, .0722][i], 0);
@@ -83,6 +85,7 @@ try {
       accentContrast: contrast(palette['--accent-deep'], palette['--paper']),
     };
   });
+  console.log('VISUAL_SYSTEM_AUDIT', JSON.stringify(typography));
   assert.equal(typography.fontStatus, 200, 'Persian font must be served by this app');
   assert.match(typography.fontMime ?? '', /font\/woff2/, 'Font must have the correct MIME type');
   assert.match(typography.family, /Vazirmatn UI/, 'Local Persian font must be first in the font stack');
