@@ -95,6 +95,7 @@ function aiUnresolvedLine(u,i){
  '<button class="ghost-btn" type="button" data-action="ai-dismiss" data-id="'+i+'">کنار گذاشتن</button></div></div>';
 }
 function aiPanel(){
+ if(state.features.orderSuggestionsEnabled===false)return '<section class="ai-box"><h3>ثبت سریع با توضیح سفارش</h3><p class="ai-helper" role="status">سرویس پیشنهاد سفارش در این محیط غیرفعال شده است. می‌توانید سفارش را مثل همیشه از منو ثبت کنید.</p></section>';
  const p=state.aiPreview,active=state.features.aiEnabled,valid=aiValidContext();
  const table=state.data.tables.find(t=>t.id===state.tableId);
  return '<section class="ai-box" aria-label="تبدیل توضیح سفارش به پیشنهاد">'+
