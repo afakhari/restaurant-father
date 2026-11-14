@@ -26,3 +26,9 @@ If the `Browser UX walkthrough and evidence` CI workflow passes, download its `r
 On a **phone**, demonstrate the three ordering steps (table → menu → order), the sticky draft summary, note editing, and the confirmation warning when changing tables with an unsubmitted draft. Show a cashier checkout confirmation in the application's own dialog. State clearly that the "connection status" label reflects the last server snapshot and is not a durable offline order queue. The latest UX acceptance matrix and limits are in [docs/UX_AUDIT.fa.md](docs/UX_AUDIT.fa.md).
 
 در نمای مدیر، نشان دهید که **بستن میز کاملاً لغوشده** پرداخت صفرِ ساختگی تولید نمی‌کند؛ علت ثبت می‌شود و صندوق‌دار این مجوز را ندارد. در صندوق، تخفیف «۵۰٬۰۰۰» با رقم فارسی و در سالن، «تفکیک قلم» برای دو نوشیدنی متفاوت را می‌توان به‌عنوان دو مثال مشخص از بومی‌سازی نشان داد.
+
+
+## Follow-on editable order-intake walkthrough
+
+Select a table, enter «دو تا لاته، یکی کم‌شیر و نوشابه», and show the two separately prepared drinks and the explicit unmatched phrase. Dismiss or resolve it, edit the proposal, add only approved items to the **draft**, and point out that the kitchen has no new ticket until final submission. Changing tables with unsaved notes should display a discard warning. When no AI provider is configured, call this limited feature **rule-based menu matching**, never a real AI demonstration. Check Persian/Arabic numerals and responsive mobile steps. This feature and any later recording are outside the original six-hour slice and do not substitute for the candidate's required narrated video.
+
