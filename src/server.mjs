@@ -33,6 +33,7 @@ function csrf(req){
 }
 async function suggestWithAI(user,body){
  requiredRole(user,['waiter','manager']);
+ if(process.env.AI_ORDER_ENABLED==='false')throw new HttpError(503,'ORDER_SUGGESTIONS_DISABLED','پیشنهاد سفارش غیرفعال است؛ از منوی دستی استفاده کنید.');
  rateLimitSuggestions(user);
  if(typeof body?.note!=='string'||body.note.trim().length<4||body.note.length>320)throw new HttpError(400,'VALIDATION','یادداشت باید ۴ تا ۳۲۰ کاراکتر باشد.');
  const endpoint=process.env.AI_API_URL,key=process.env.AI_API_KEY,model=process.env.AI_MODEL;
@@ -59,7 +60,14 @@ async function suggestWithAI(user,body){
 }
 
 // Request-bound intake is distinct from order creation and has no database writes.
-const orderSuggestionCalls=new Map(),orderTenantDailyCalls=new Map();
+const orderSuggestionCalls=new Map(),orderTenantDailyCalls=new Map(),orderSuggestionPending=new Map();
+async function withSuggestionSlot(user,action){
+ const k=user.restaurantId+':'+user.id,used=orderSuggestionPending.get(k)??0;
+ if(used>=2)throw new HttpError(429,'AI_BUSY','دو تحلیل هم‌زمان در حال انجام است. درخواست قبلی را بررسی کنید.');
+ orderSuggestionPending.set(k,used+1);
+ try{return await action();}
+ finally{const current=(orderSuggestionPending.get(k)??1)-1;if(current>0)orderSuggestionPending.set(k,current);else orderSuggestionPending.delete(k);}
+}
 function rateLimitSuggestions(user){
  const now=Date.now(),key=user.restaurantId+':'+user.id;
  for(const [k,v] of orderSuggestionCalls)if(v.until<=now)orderSuggestionCalls.delete(k);
@@ -120,7 +128,7 @@ async function suggestOrder(user,body){
   return {branchId:table.rows[0].branch_id,sessionId:active,menu};
  });
  const hasProvider=featureFlags().aiEnabled;
- const parsed=hasProvider?await modelOrderSuggestions(request.text,ctx.menu):parseOrderRules(request.text,ctx.menu);
+ const parsed=hasProvider?await withSuggestionSlot(user,()=>modelOrderSuggestions(request.text,ctx.menu)):parseOrderRules(request.text,ctx.menu);
  const result=safeOrderSuggestions(parsed,ctx.menu);
  const fingerprint=crypto.createHash('sha256').update(JSON.stringify(ctx.menu.map(m=>[m.id,m.name,m.price_toman,m.available]))).digest('hex');
  return {...result,source:hasProvider?'ai':'rules',clientRequestId:request.clientRequestId,context:{tableId:request.tableId,branchId:ctx.branchId,sessionId:ctx.sessionId,sourceRevision:request.sourceRevision,menuFingerprint:fingerprint}};
