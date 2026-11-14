@@ -1,92 +1,76 @@
-# AI_USAGE — Assessment disclosure
+# AI_USAGE | AI assistance, accountability and verification
 
-This project was produced with assistance from **OpenAI ChatGPT (GPT-6)** and the connected **GitHub tool**, together with local command-line tools. This is a disclosure of assisted work, not a claim that every line was manually typed or that all suggested output was correct.
+**Assessment disclosure — revised 2026-11-14.** This is a **solo AI-builder assessment**: using AI was part of the workflow, not a detail to disguise. The submission openly attributes substantial research, design, code and writing assistance to **OpenAI ChatGPT (GPT-6)** working with GitHub and local/CI tooling. The candidate remains responsible for the chosen product, what is submitted, and explaining every important trade-off.
 
-## Tools used and for what
+**Time statement (candidate-reported):** **approximately six hours of productive, hands-on involvement in total, spread over separate sessions**. This is **not** a claim of six continuous hours from first to last commit. Pauses, time waiting for unattended model/tool output, CI execution and deployment wake-up are not treated as active personal work. This estimate is provided by the candidate, not reconstructed from timestamps or independently time-tracked. Chronologically later edits do not imply additional continuous work.
 
-- **ChatGPT / GPT-6:** compared existing open-source restaurant products, proposed product scope, mapped Iranian UX/service workflow, drafted the database schema, HTTP API, RTL UI, seed, test scenarios, security review and documentation. It generated a substantial share of implementation code. Human review before submission is still needed.
-- **GitHub connector:** searched source repositories, inspected representative order/kitchen/cashier code, verified target repository permissions, created a feature branch and committed `SCOPE.md` **before implementation**, and prepared product changes as a reviewable PR.
-- **Local Node.js:** executed `node --check` and the initial six pure unit tests, later extended to nine, in `node --test`; outputs were examined.
-- **Automated PostgreSQL tests:** GitHub Actions provisioned PostgreSQL 16 and ran migration, seed and the original six unit/five integration tests **successfully** on `main` (run `43479468638`); a subsequent review expanded the suite to nine unit and eleven integration tests (PR #7 CI run `43498681600`). The tests were not locally executed with PostgreSQL in the authoring environment, which lacks a Docker daemon.
+## 1. What AI was used for
 
-## What AI genuinely accelerated
+| Activity | Nature of assistance | Human / evaluator checkpoint |
+| --- | --- | --- |
+| Understanding the brief | Interpreted an intentionally underspecified Iranian restaurant problem, compared open-source interaction patterns and identified highest-risk handoffs | Why a narrow shift workflow is preferable to a half-built ERP |
+| Product definition | Proposed user journeys, roles, operational invariants, initial SCOPE and exclusions | Candidate chose and must defend scope, exclusions and order of priorities |
+| Backend/data | Generated and revised Node.js APIs, PostgreSQL schema/migrations, tenant-context/RLS approach, state transitions, idempotency and server-owned billing | Source inspection, executable tests, security caveats |
+| Frontend/UX | Helped author RTL Persian layouts, mobile navigation, error states, confirmations, input normalization and editable proposal interface | Browser interaction, accessibility and responsive checks |
+| Quality and delivery | Drafted unit/integration/browser tests, CI setup, Docker/demo guidance, security/decision documents and walkthrough plan | Actual run results, HTTPS verification and candidate narration |
+| Runtime order suggestions | Designed optional bounded model request, validation and human-reviewed preview; also a separate deterministic menu matcher | Without real provider configuration, the matcher is **not** an LLM demonstration |
 
-Discovery of existing interaction patterns (table sessions, per-item KDS transitions, cashier running bills), first-pass documentation, repeated API validators, unit test cases and a consistent Persian UI. The largest saved cost was avoiding a huge POS/ERP scope and choosing one independently defensible workflow.
+The GitHub connection was used for repository inspection, code changes and commits. Local command-line tools were used for JavaScript syntax/unit checks. GitHub Actions ran database-backed integration and Chromium browser tests where configured. **AI-generated code was not presumed correct merely because it compiled.**
 
-## What AI initially got wrong or underspecified
+## 2. Product decisions, not just text generation
 
-1. The first CI run exposed a missing UPDATE privilege for a `SELECT ... FOR UPDATE` lock on `dining_tables`. The lock was replaced with an advisory transaction lock keyed by table UUID, preserving serialization without broadening write privileges on the table.
-2. The early idempotency fast path also needed to verify that a replay key belongs to the *same table*, not just the same actor. The wrong-table replay now returns 409 and the integration suite covers it.
-3. The first order insertion draft checked the idempotency key before locking the table, but not *after* the lock. Two simultaneous retries could have raced to the database unique constraint and returned a 500. This was corrected by adding a second lookup under the table row lock.
-4. The initial migration granted UPDATE privileges on immutable order rounds and events. Those were reduced to SELECT/INSERT only for the runtime DB role.
-5. The proposed checkout rule is too strict for guests paying early. The current limitation is documented rather than represented as universal restaurant behavior.
-6. A successful in-memory UX prototype must not be misrepresented as a production-tested deployed app. A live HTTPS endpoint, real LLM provider and video are explicitly outstanding unless separately confirmed.
+The product judgment lies in choosing one coherent working path: a table session with append-only order rounds, per-item kitchen status, separate physical handoff, a server-computed bill and role-limited cashier attestation of an **external** payment. Two fictional restaurant tenants give isolation tests something concrete to challenge.
 
-## One recommendation intentionally rejected
+This is not a claim that a customer pilot, owner interview or quantified time-saving study was performed. The customer and operating data in the demo are illustrative. Dated follow-on refinements were prompted by exception and UX review, not by invented real-world observation.
 
-**Rejected:** Forking a large existing POS (Krudex, PlateOS, or a near-identical earlier assessment project) and renaming it. These systems have unrelated flows, deployment dependencies, unclear reuse permissions in several cases, and too much surface area for a six-hour assessment. We extracted learnings from inspected UI/architecture rather than copying their code.
+## 3. Where generated proposals were wrong, and how the design changed
 
-**Also rejected:** Automatically posting AI-extracted Persian food orders to the kitchen. Human approval is required because item-specific notes such as «یکی بدون پیاز» can be assigned to the wrong dish.
+The useful part of AI assistance was not the first draft. Important corrected or challenged behaviors include:
 
-## How generated code was checked
+1. **PostgreSQL locking privilege:** the initial SELECT ... FOR UPDATE on a restricted table required UPDATE permission the runtime role did not have. The approach changed to transaction-level advisory locking rather than broadening that permission. GitHub CI exposed the issue.
+2. **Duplicate retry race:** looking up an idempotency key only before acquiring the table lock allowed two concurrent retries to race. A second lookup under the lock was added.
+3. **Idempotency identity:** matching only a request key could silently accept a prior order with a different table, quantity or preparation note. Replays now compare table and canonical contents; mismatches return HTTP 409.
+4. **Over-broad table privileges:** initial migration privileges on immutable round/event data were narrowed.
+5. **Historical paging:** a general snapshot LIMIT could push open orders out of results after enough history. Open sessions and associated items were preserved, while closed history was bounded separately.
+6. **Role leakage:** a hidden cashier tab did not prevent a kitchen user from examining sensitive bill data in the JSON response. Role-specific server projections were introduced.
+7. **Cancellation dead end:** an entirely cancelled session could remain blocked or tempt a false zero-value “payment.” A manager-only, reasoned no-payment void was added.
+8. **Browser form bug:** a visually hidden required cancellation-reason field blocked a custom checkout confirmation; browser validation exposed it and the flow was corrected.
+9. **Responsive rendering/input:** a mobile CSS cascade issue and an operator-precedence syntax error in frontend JavaScript were found and corrected; Persian/Arabic digits, letter variants and separate item notes gained explicit handling.
+10. **Natural-language safety:** the early small note parser did not cover table switching, ambiguous phrases or per-unit preparation well enough. The later editable proposal flow keeps unresolved text visible and requires separate human approval and transactional submission.
 
-- Verified JSON body parsing, UUID/quantity bounds, price snapshot trust boundary, state transitions, discounts, checkout guards, cookie flags, origin checks and tenant scoping in source.
-- Ran local JS syntax checks and unit tests for domain rules, including no client price trust, legal/illegal item transitions, bill totals and AI menu ID validation. Current local unit tests: **9/9 passed in the authoring environment**.
-- Wrote a DB integration suite and CI workflow for independent tenant data, direct RLS no-context checks, concurrent round submissions, duplicate retry, role isolation, full order-to-checkout and CSRF. **GitHub Actions confirmed 11/11 integration and 9/9 unit tests passing** on the review branch (run `43498681600`). The original main branch passed 5/5 integration and 6/6 unit tests (run `43479468638`); the additions have not yet been deployed to a public host.
-- No hand-run multi-device test, provider-side injection red-team, real banking test, external penetration test or full load test was completed. Those limitations are not hidden.
+These are concrete corrections evident in code/tests and repository history. They are **not** claims of an external security audit or proof that every edge case has been eliminated.
 
-## Architecture decisions that came from our product reasoning
+## 4. Verification actually represented
 
-The central table-session model, append-only rounds, distinction between kitchen readiness and physical service, explicit cashier refusal before handoff, employee-specific screens, narrow note parsing, two tenant demo fixtures and the six-hour scope boundary were chosen as a product strategy. The code implementation was AI-assisted, and all choices should be evaluated rather than accepted solely on AI authority.
+**Executable artifacts in the repository:** package.json includes syntax checking and unit tests; tests/integration.test.mjs exercises database-dependent scenarios; GitHub Actions workflows use PostgreSQL 16 and browser automation. Earlier documented successful runs include main run **43479468638** (initial six unit and five integration tests) and review-branch run **43498681600** (nine unit and eleven integration tests). These historical runs support those **specific revisions only**; counts and status must be rechecked for the **latest** commit using [GitHub Actions](https://github.com/afakhari/restaurant-father/actions).
 
-## Prompt history relevant to submitted work
+The tests cover, in the versions documented, tenant isolation, role boundaries, full order-to-settlement, concurrent rounds, retry protection, invalid transitions, cancellation, UI/browser flows and localized input. Tests using a **simulated provider** validate API contracts and failure handling, **not** authentic model capability. A mock-backed browser layout review at 320, 390, 768, 1024 and 1440 pixels is useful visual evidence, but not a real-phone or end-to-end PostgreSQL acceptance test by itself.
 
-This repository was produced in a longer Persian-language discussion, including these **user requests** (verbatim or with omission of the long quoted assessment):
+**Not independently established as production-ready:** iOS/Safari and assistive-technology coverage; a sustained load test; full penetration testing; operational backups/restore; real payments; legal invoicing; deployed user acceptance from an Iranian network; actual model correctness and contractual availability for Iran. The public Render demo has a recorded URL, but a health response alone does not prove that login, cookies, every role and the full hosted scenario work. The candidate-recorded narrated 5–10 minute video is a separate required submission artifact; a CI video cannot replace it.
 
-- «بررسی ات را روی همین مواردی که پیدا کردی و شرح تسک و نیاز من بیشتر کن و امکان سنجی کن»
-- «صرفا فرایند هایی که طی می شود و امکاناتی که دارند و خلاقیت هایی که به خرج دادن و فرایند هایی که طراحی کردن و ux ای که ارائه کردن را به دقت بررسی کن»
-- «بله همین کار را به طور کامل انجام بده»
-- «بر اساس تسک و یافته هایت اقدامات لازم را به طور کامل در گیت هاب انجام بده و پیش برو.»
+## 5. Runtime AI feature: what is and is not AI
 
-A subsequent user request, «تمامی اقدامات لازم را انجام بده», authorized continuing the release work. The earlier implementation request also contained the full English **Senior Full-Stack Engineer — Solo AI Builder Assessment** and specified the target repository `https://github.com/afakhari/restaurant-father`. The task was not given to AI as an empty, standalone feature checklist; product choices were discussed first. No fictional prompt history or hidden tests are claimed.
+**Actual workflow:** a waiter/manager chooses a table and writes a Persian description; the server checks authenticated restaurant/table/session context; the interface offers menu-linked candidate rows, quantities, preparation notes, source phrases and unresolved text. Staff can correct, split, replace, explicitly dismiss uncertain text and add only approved lines to a **local draft**. The final **send to kitchen** is a distinct, server-validated transaction.
 
-## AI API failure/cost/prompt-injection posture
+**Without a configured external model:** the system can do restricted **rule-based menu matching**, clearly labeled «تطبیق ساده با منو». It **does not** constitute a live LLM, semantic intelligence benchmark or paid inference.
 
-Provider call is optional and server-side, with an HTTPS endpoint, timeout, low temperature, at most 300 output tokens and an explicitly bounded menu subset. User notes are untrusted content; the prompt instructs the provider to return JSON only, but prompt text is **not the security boundary**. A second server-side parser discards unknown menu IDs, invalid counts and extraneous properties. A cashier or kitchen action is never delegated to AI. Provider errors fail visibly and allow manual ordering. This bounded design controls the common hallucination/cost/latency risks but has not been independently adversarially evaluated.
+**With an authorized configured model:** requests are server-side and bounded by menu context, timeouts, quantity/schema limits and rate limits. Model output is untrusted and must pass server checks; no model can set a price, act as a different tenant, authorize settlement, or directly create an order. Misheard or ambiguous Persian clauses require user review; the server rejects changed price expectations. Manual ordering works when inference is unavailable. Provider access, terms for serving Iran, data retention, true Persian accuracy and billed cost remain to be confirmed before production activation.
 
-An export of the actual user instructions and the runtime AI system prompt for the ATS prompt field is in [AI_PROMPTS.md](AI_PROMPTS.md). Browser recordings, if generated in CI, are explicitly labeled automated and do not imply candidate-narrated video.
+The provider kill switch and per-instance quotas are **not** distributed fleet-wide cost guarantees. Provider output may still be wrong; prompt instructions are not a security perimeter. The note input is untrusted and should not contain customer identity, phone or payment-card information.
 
-## Follow-up verification and corrections
+## 6. Explicitly rejected AI-assisted shortcuts
 
-A subsequent source review identified that the initial `/api/shift` global LIMIT clauses could omit active orders after sufficient history. The query was changed to always include open sessions and their associated rounds/items, while bounding closed history separately. A single-instance login throttle was added with explicit limits. Additional automated integration tests exercise AI being unavailable and a local simulated provider; these do not claim a real AI API has been used. Actual time spent and any overrun of the challenge cap must be disclosed by the candidate.
+- **Copying or rebranding an existing full POS:** research into open-source products informed observable workflows, but wholesale reuse introduces irrelevant modules, licensing and integration risk and undermines a focused assessment. No claim is made that public repositories were authored here.
+- **Letting an LLM submit orders autonomously:** it could assign «بدون پیاز» to the wrong meal, invent nonexistent dishes or wrongly charge a customer. An editable human-approved proposal is safer.
+- **Calling deterministic matching “AI”:** it can produce a usable demo but misleads an evaluator about real inference.
+- **Claiming an unobserved green build, deployed browser journey or recorded speech:** those must be linked to actual evidence.
 
+## 7. Prompt provenance and historical scope
 
-## Additional UX/code-review pass (2026-11-13)
+[AI_PROMPTS.md](AI_PROMPTS.md) contains user-provided Persian requests and distinguishes the older /api/ai/parse system prompt from the newer /api/ai/order-suggestions flow. The code in **src/server.mjs** and **src/ai-order.mjs** is the source of truth for runtime behavior; this document is not a fabricated transcript of model internals or unseen human conversations.
 
-The product UI was reviewed against real Chromium acceptance screenshots, then redesigned for legibility and task completion on smaller screens. ChatGPT assisted with CSS, browser tests, accessibility labels, and documentation. The authoring environment separately ran a **mock-backed Chromium layout review** at 320, 390, 768, 1024 and 1440px; this only verifies visual layout under representative sample data, not PostgreSQL integrity. The GitHub Actions browser job is responsible for verifying the actual seeded Node/PostgreSQL workflow.
+The initial SCOPE was recorded first; source changes, stronger role projection, failure fixes, mobile UX and the editable text-intake feature were added in later passes. **“Later” describes the sequence of work, not an additional block of uninterrupted time.** The candidate's stated effort remains **approximately six productive hours aggregated across sessions**. If asked in an interview, explain which work was done directly, where ChatGPT generated implementation, what failed and what was rerun rather than presenting AI-assisted output as unaided typing.
 
-Corrections introduced during this pass included fixing a CSS cascade conflict that initially displayed the order pane in the mobile tables stage, and fixing a JavaScript operator-precedence syntax error in the AI note handler before committing. Both were caught by actual browser rendering or `node --check`, not assumed safe because a model generated the snippet. The new UI uses an app dialog for cashier receipt confirmation and cancellation, a draft-loss guard, connection status and a server-side AI configuration flag. Browser automation must still pass on the latest commit.
+## 8. What I would check before accepting the handover
 
-**Scope/time honesty:** these additional UX improvements were requested after the initial MVP. The repository's timestamps do not establish the candidate's personal working time; the applicant must disclose a true elapsed work total and any overrun against the initial six-hour cap.
-
-**Browser CI regression found and corrected:** the first browser run with the new custom checkout dialog timed out because the cancellation-reason textarea was still HTML-required while visually hidden. Browser constraint validation prevented the checkout form from submitting, so no payment POST occurred. The code now disables that input for cashier confirmation, and the browser test waits for an actual successful checkout HTTP response before accepting the UI result. This is further evidence that AI-written UI must be exercised end to end.
-
-
-## Further verification and model-assisted corrections
-
-A later real-shift review revealed two previously under-addressed issues: (1) API responses exposed prices/payment metadata to kitchen users even though their screen hid those values; (2) an all-cancelled table could never be released without an incorrect paid receipt. The response projection and manager-only void endpoint were added with negative-role and audit tests. UI localization was supplemented with pure Persian/Arabic digit and keyboard normalization tests. These are engineering interventions driven by exception analysis, not evidence of live banking or real provider-backed AI inference.
-
-
-## Latest edge-case correction and provenance
-
-A subsequent review found that reusing an idempotency key on the *same table* with **different item quantities or notes** could return a replay success for the old order, silently discarding an edited retry after a network failure. The server now compares canonical item/quantity/note contents and returns HTTP 409 on a mismatch. The client retains the draft and tells staff to inspect the table before submitting a new round. This was checked with a new PostgreSQL negative test.
-
-The same review tightened role-specific JSON responses, added manager-only fully cancelled table release (with no fake payment), and introduced tests for localized Persian/Arabic discount digits. These decisions were informed by AI-assisted analysis and then checked with local unit tests and GitHub Actions, not through direct observation of a real restaurant shift.
-
-
-## Later feature: editable order suggestions (2026-11-14)
-
-At the user's request after the original assessment, GPT-6 assisted with the product/UX threat review and implementation of a table/session-bound `/api/ai/order-suggestions` endpoint, a Persian editable proposal UI, explicit handling of unresolved phrases, a **clearly labeled non-AI rule-based fallback**, optional model integration, and price-snapshot conflict handling. Human approval remains separate from final order creation. Unit tests, PostgreSQL integration and Chromium browser tests were added and must be checked against their specific CI runs before making release claims.
-
-A provider-backed model was not activated as part of this work, and no authentic model accuracy or latency results are claimed. Iran-market eligibility and user-data handling must be reviewed with a real provider before enabling paid inference. The original six-hour task has not been retroactively expanded; this is follow-on work requested later.
-
+Start from a clean local database, run documented checks, inspect current CI, test the full waiter → kitchen → served → cashier cycle with actual credentials on the hosted domain, try a cross-tenant ID and an unauthorized action, force a stale retry and network failure, confirm a phone-width draft flow, then record a **genuine candidate narration** focused on decisions and limitations. A failure is a useful finding, not something to hide.
