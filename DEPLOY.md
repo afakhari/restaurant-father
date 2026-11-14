@@ -1,12 +1,12 @@
 # Deployment and HTTPS checklist
 
-**Status:** GitHub repository and Docker Compose recipe prepared. **No live HTTPS deployment has been completed or verified by the authoring environment.** A public URL cannot be invented; neither can credentials for an unprovisioned host.
+**Status (2026-11-14):** A Render Free demo URL is recorded in the repository: **https://restaurant-father-demo-xem8.onrender.com**. Render/Neon provisioning and a healthy service were reported during deployment, but an independent external HTTPS login and complete hosted browser acceptance walkthrough are **not yet verified**. This file remains the reproducible deployment and security checklist. Visitors accessing Render from Iran may need to enable a VPN.
 
 ## Free-tier reviewer demo (recommended)
 
 Use the root [render.yaml](render.yaml) for a **free Render web service** and a **separate Neon free-tier PostgreSQL database**. See [docs/FREE_DEMO_DEPLOY.fa.md](docs/FREE_DEMO_DEPLOY.fa.md) for the complete, ordered procedure, GitHub Actions bootstrap and HTTPS verification.
 
-The web service receives only `DATABASE_URL` for the unprivileged `restaurant_runtime` role; `ADMIN_DATABASE_URL`, `DB_APP_PASSWORD` and `DEMO_PASSWORD` must not be stored in Render runtime environment variables. `PUBLIC_ORIGIN` is wired to the Render-generated HTTPS URL, and secure cookies are enabled. No live URL, Neon database or Render service has been created or claimed by this repository.
+The web service receives only `DATABASE_URL` for the unprivileged `restaurant_runtime` role; `ADMIN_DATABASE_URL`, `DB_APP_PASSWORD` and `DEMO_PASSWORD` must not be stored in Render runtime environment variables. `PUBLIC_ORIGIN` is wired to the Render-generated HTTPS URL, and secure cookies are enabled. The current demo URL is https://restaurant-father-demo-xem8.onrender.com. Confirm authentication, authorization and the full operational workflow from an external browser before submission; a deployed service alone is not acceptance evidence.
 
 ## Local reproducible environment
 
