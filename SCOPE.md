@@ -1,60 +1,77 @@
-# SCOPE — ShiftYar (شیفت‌یار)
+# SCOPE | ShiftYar (شیفت‌یار)
 
-**Agreement date:** 2026-11-13. **Status:** written before product implementation. **Time cap:** 6 hours active engineering work. **Customer:** one Iranian full-service café/restaurant. **Product type:** future multi-tenant SaaS with branches.
+**Document status:** Assessment scope with a dated change log, revised 2026-11-14. The original scope was recorded on 2026-11-13 before implementation; Git history is the record of its original wording. This revised document makes the acceptance contract clearer and distinguishes subsequent work. **The assessment's six-hour active-work limit is a requirement, not a claim about actual elapsed work.** The candidate must report actual time honestly.
 
-## Customer problem and chosen slice
-During a live shift, a waiter adds a drink to a table, the kitchen starts preparing a dish, another waiter adds a second round and a cashier needs a correct bill. Paper notes and disconnected apps create lost additions, ambiguous handoffs, and accidental checkout. We choose **table-session → multi-round order → per-item kitchen progress → waiter handoff → internally recorded checkout** as one vertical workflow. A restaurant owner can use the seeded demo to experience an actual shift, not a dashboard of fictional KPIs.
+## 1. Product thesis and customer hypothesis
 
-## Users and responsibilities
-- **Waiter:** see tables and menu, open/add a round, check status, mark READY items SERVED, cancel only QUEUED items with a reason.
-- **Kitchen:** see queued/preparing items, mark QUEUED → PREPARING → READY; cannot change price or bill.
-- **Cashier:** see running bill, apply bounded discount, record **offline/counter payment** and close a fully served session.
-- **Manager:** perform all staff actions, review audit history. No customer PII is needed for the chosen slice.
-- Login identities and restaurant memberships are server-verified; a restaurant never chooses its tenant in a request payload.
+A small Iranian café or table-service restaurant does not primarily need another dashboard. During a shift it needs a dependable answer to four questions: **What did this table order? What is the kitchen doing with each item? Has the guest received it? What can the cashier safely settle?**
 
-## User journey and acceptance criteria
-1. Waiter logs in and chooses an occupied/free table. An open table has at most one active session.
-2. Waiter selects menu items, quantities, Persian notes and posts a round. Prices are looked up by the server and snapshotted. A repeated submission with the same idempotency key creates no duplicate.
-3. Two simultaneous additional rounds to the same table both survive; kitchen updates cannot overwrite additions; individual items change status under explicit transition rules.
-4. Kitchen progresses each item. READY is distinct from SERVED: waiter confirms actual handoff to customer.
-5. Cashier sees the sum across every round, applies discount without exceeding subtotal, and records a payment method. Closing an unsettled/in-progress table is denied.
-6. Restaurant A's API and DB queries cannot reveal or mutate restaurant B's tables, menu, items, sessions or events. Evidence: independent tenants seeded and automated negative tests.
-7. Each role has realistic seeded credentials, branch/table/menu data, an active busy shift and history (a previously closed shift).
-8. AI offers **optional Persian note-to-menu extraction**, anchored to the current restaurant's menu, with human review before submission. No AI output can set prices or write directly to the DB; error/timeout must not block manual ordering.
+The first customer is represented by *fictional demo fixtures*, not by a claimed paid pilot, formal interview study or measured market adoption. The hypothesis is that a shared, Persian-first shift workflow reduces missed second rounds, ambiguous kitchen handoffs and bill discrepancies. Real staff observation is the next validation step, not an accomplishment of this submission.
 
-## Domain and product boundaries
-**In:** Persian RTL; toman stored as integer; branches within a restaurant; staff RBAC; table session; multiple order rounds; independently tracked item status; append-only actor/timestamp audit events; short-lived authenticated session; transactional server writes; tenant isolation with PostgreSQL RLS; validation and meaningful errors; four handover artifacts, tests, seeded demo, local one-command boot where possible.
+**Chosen vertical slice:** authenticated waiter → select table → create a session and one or more order rounds → kitchen progresses each item → waiter confirms service → cashier records an external payment and closes the table. A manager reviews events and handles the fully-cancelled exception. This is an operational MVP, **not** a complete POS, ERP, fiscal system or real payment gateway.
 
-**Out:** regulatory/fiscal invoices, bank/card terminal integration, real online payments, inventory purchasing, table reservations, fiscal tax claims, refunds, customer accounts, loyalty, printer setup, full offline-first synchronization, splitting bills among customers, food delivery, advanced analytics, production call-center support. Recorded payment means **cashier states the money was received outside this application**, not proof of funds transfer.
+## 2. Who it serves and what each role can do
 
-## Research and Iran-specific decisions
-- RTL Persian for staff at a noisy restaurant; table numbers prominent; zero-ambiguity READY vs SERVED.
-- **Integer toman** for local menu and bill, with clearly labeled units; no silent toman/rial conversion.
-- Notes such as «بدون پیاز» must remain attached to the correct item. No invented prices, AI menu names, tax percentages or official receipts.
-- A first branch and a second branch belong to one restaurant; another restaurant exists as a negative-isolation fixture.
-- A customer may order repeatedly without closing the table. Cashier cannot accidentally close a table while food is being prepared.
+| Role | Primary job | Authority boundary |
+| --- | --- | --- |
+| Waiter (پیشخدمت) | Select branch/table, build a draft, append rounds, review order progress, mark ready items served | May cancel queued items with reason; cannot settle a bill or modify menu prices |
+| Kitchen (آشپزخانه) | View relevant active tickets and notes; move queued → preparing → ready | Does not receive billing/payment fields or mark an item served |
+| Cashier (صندوق‌دار) | Review every round, apply a validated discount, confirm money was received outside the app, settle eligible sessions | Cannot declare food ready or close an unfinished normal session |
+| Manager (مدیر) | Work across staff views, inspect audit events, handle started-item cancellations and fully-cancelled table release | Exceptional actions require reason and server validation; does not imply refunds |
 
-## Delivery approach and evidence
-- PostgreSQL migrations and seed, runtime non-superuser with FORCE RLS on business tables, per-request scoped transaction.
-- Server-side role checks and input validation; no trusting client-provided totals.
-- Tests covering **two concurrent rounds**, **idempotency**, **tenant separation**, **invalid state transition**, and **end-to-end order-to-settlement**. Document tests not run.
-- HTTPS deployment and reachable demo credentials **only if deployment credentials/integration are available**; do not pretend a local Docker build is live.
-- README, DECISIONS.md, AI_USAGE.md, HANDOVER.md, and video walkthrough instructions.
+Accounts are associated with a restaurant on the server. The demo includes two branches of Narenj and a separate Darband restaurant. **Current roles are restaurant-scoped, not restricted to individual branches.** Branch-specific memberships are future work.
 
-## Risk register
-1. Cross-tenant leak: tenant context derived only from verified staff membership; RLS deny-by-default; try cross-tenant ID requests.
-2. Lost/double order: database transactions, row locks, monotonic version, client request idempotency.
-3. Wrong bill/unauthorized checkout: server-snapshot prices and guarded checkout; explicit cashier role; audit.
-4. AI hallucinates/slow: strict item ID/quantity schema, fallback to manual, time budget and bounded model inputs.
+## 3. Acceptance contract: a shift that actually works
 
-## Success / explicitly accepted trade-offs
-This is a **narrow operational service MVP**, not a full ERP. Use polling over advanced event streaming; prefer usable and correct cross-role updates to decorative real-time effects. Artificially seeded demonstration data is marked as such. The screen layout is a prototype until connected to working persistence and tested backend. If a live deployment is unavailable, say so in the handover instead of fabricating a URL.
+| ID | Observable acceptance criterion | Verification surface |
+| --- | --- | --- |
+| A1 | Staff authenticate and see only permitted pages, actions and response fields | src/auth.mjs; server role checks; tests/integration.test.mjs |
+| A2 | At most one open session exists per physical table; a later order appends a round without replacing earlier rounds | db/001_initial.sql; src/operations.mjs; integration tests |
+| A3 | Two concurrent additions survive; identical request retries do not create duplicates; edited reuse of a key is rejected with 409 | src/operations.mjs; concurrency/idempotency tests |
+| A4 | Every item follows explicit state transitions; READY is not SERVED; cancellation needs the proper role and reason | src/core.mjs; src/operations.mjs; tests |
+| A5 | Totals use server-snapshotted integer **toman** prices across all rounds; a discount cannot exceed subtotal | src/core.mjs; src/operations.mjs; tests |
+| A6 | Normal checkout is blocked until all non-cancelled items are served; a fully-cancelled table can be voided by a manager without inventing payment | src/operations.mjs; audit and negative tests |
+| A7 | A staff member from restaurant B cannot access restaurant A's menu, session, item or events through guessed IDs | db/001_initial.sql FORCE RLS; tests/integration.test.mjs |
+| A8 | A new employee can start a fictional local demonstration with Docker Compose and complete the four-role workflow | compose.yaml; scripts/seed.mjs; README.md; guided manual check |
+| A9 | On a small screen a waiter can move through table → menu → draft, see connection failures and avoid losing an unsent draft by accidental navigation | src/public; browser-evidence workflow; manual device review still needed |
 
-## Scope-control rule
-Finish and test the single round-trip workflow before adding optional AI refinements or new screens. Any extra feature must justify removing something from the six-hour cap.
+**Evidence standard:** a test's existence is not proof that the latest commit passed. Check the actual CI run, deployment and browser interaction before marking a criterion verified. The public demo's health response does not establish successful login or checkout.
 
+## 4. Core invariants and failure behavior
 
-## Chronological follow-on scope decision (2026-11-14)
+- **No silent data loss:** rounds append; writes serialize on a table; stale table/session/item versions return conflicts that the employee must resolve.
+- **No duplicate charge on retry:** an idempotency key is tied to the original table and canonical items, quantities and notes, not merely the presence of a UUID.
+- **No invented money:** amounts come from server-owned menu snapshots. Checkout is a cashier's *attestation of payment received elsewhere*, never bank verification. Fully cancelled voids create no payment.
+- **No cross-tenant trust:** tenant context comes from an authenticated membership; a restricted PostgreSQL runtime role and FORCE RLS provide defense in depth.
+- **No unsafe model authority:** text suggestions never select a tenant, change a price, execute a payment, or submit a real order. The employee explicitly confirms the final draft.
+- **No false offline success:** polling and visible error states exist, but there is no durable offline write queue. On a failed write, staff must inspect the table before trying again.
 
-The original scope above is preserved as a historical record. A later user request expanded optional note parsing into an editable text-to-proposal workflow: table-bound requests, strict menu-only suggestion validation, distinct preparation notes for differently prepared units, explicit handling of ambiguous/missing items, draft review, and separately confirmed order posting. A deterministic fallback is labeled non-AI where no provider is configured; legal/business access and cost controls must precede real AI inference for the Iranian market. This extension is later work and must not be represented as part of the initial six-hour assessment. Supporting files: docs/AI_ORDER_INTAKE_SPEC.fa.md, docs/AI_ORDER_TECHNICAL_DESIGN.md, tests/ai-order.test.mjs.
+These are design guarantees to test, **not** claims of zero bugs, production certification or successful field deployment.
 
+## 5. Iranian operating context
+
+Persian RTL staff screens, Vazirmatn, Persian calendar and Asia/Tehran display time, Persian/Arabic/Latin numeral handling where applicable, explicit **تومان** labeling, and normalization of ی/ي and ک/ك improve day-to-day usability. Item-specific instructions such as «بدون پیاز» remain attached to the correct line. Two identical beverages with different preparation notes can be separated. This is intentional localization, not a generic translated POS.
+
+No tax percentage, fiscal receipt, bank settlement or legal compliance is inferred merely from operating in Iran. Any real banking, invoicing, hosting or AI-provider arrangement requires separate legal and operational verification.
+
+## 6. Deliberately excluded from the first operational slice
+
+Real banking/card-terminal integration, Shaparak settlement, refunds and payment reconciliation; official/e-invoices and tax workflows; inventory purchasing; printer hardware; online customer QR ordering; reservations; delivery; loyalty/customer accounts; split bills; robust offline synchronization; push notifications; comprehensive reporting; branch-limited staff accounts; backups and production incident management.
+
+These omissions are **product choices**, not hidden completed features. A usable, testable end-to-end service flow takes priority over a broad collection of disconnected screens.
+
+## 7. Scope change log, not a rewritten six-hour history
+
+| Stage | Scope treatment |
+| --- | --- |
+| **2026-11-13: initial assessment baseline** | Four staff roles, table sessions, multiple rounds, item lifecycle, checkout attestation, tenant isolation, Persian UI, seed, tests and handover. Optional bounded note parsing was identified but never allowed to hold up manual ordering. |
+| **Subsequent correctness/UX passes** | Manager-only started-item cancellation and all-cancelled void, role-specific API projections, stronger idempotency replay checks, localized inputs, mobile steps and draft-loss guards. These are documented changes, not evidence of field validation. |
+| **2026-11-14: follow-on order-intake enhancement** | A table/session-bound Persian text → editable proposal → explicitly approved draft workflow, unresolved phrases, deterministic non-AI menu matching, optional provider-backed inference and price-change conflicts. See docs/AI_ORDER_INTAKE_SPEC.fa.md and docs/AI_ORDER_TECHNICAL_DESIGN.md. |
+
+**Time accounting:** repository timestamps or AI output do not establish six hours of actual candidate work. Any work beyond the original assessment limit must be disclosed as follow-on or overrun, not backdated into the initial scope.
+
+## 8. Release gate and next learning milestone
+
+Before presenting this as a working hosted demo, confirm latest-main syntax/unit/integration/browser CI; run a real HTTPS login and the complete waiter → kitchen → waiter → cashier journey with the *hosted* credentials; check a second tenant and one rejected unauthorized action; inspect a mobile layout; record the required personally narrated 5–10 minute walkthrough. See SUBMISSION_CHECKLIST.md and WALKTHROUGH.md.
+
+The next product question is not “Can we add more modules?” It is **“Do restaurant employees complete the cycle faster and with fewer handoff errors than their current practice?”** That requires measured observation in a real restaurant, still outstanding.
