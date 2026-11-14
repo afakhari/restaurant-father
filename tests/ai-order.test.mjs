@@ -67,3 +67,19 @@ test('line-specific price expectation stays separate from client-provided price'
  assert.equal('price_toman' in r.items[0],false);
  assert.throws(()=>parseRound({tableId:ids[5],expectedSessionId:null,idempotencyKey:ids[6],items:[{menuItemId:ids[0],quantity:1,note:'',expectedPriceToman:-1}]}));
 });
+
+test('two separate modifiers attach to two different latte units',()=>{
+ const x=parseOrderRules('دو لاته، یکی کم‌شیر، اون یکی بدون شکر',menu);
+ assert.equal(x.items.length,2);
+ assert.equal(x.unresolved.length,0);
+ assert.deepEqual(x.items.map(v=>orderKey(v.note)).sort(),['بدون شکر','کم شیر'].sort());
+ assert.deepEqual(x.items.map(v=>v.quantity).sort(),[1,1]);
+});
+test('ambiguous multiple menu names and repeated mentions fail closed',()=>{
+ const multi=parseOrderRules('یک لاته یک چیزکیک',menu);
+ assert.equal(multi.items.length,0);
+ assert.equal(multi.unresolved[0].reason,'multiple_menu_items');
+ const repeated=parseOrderRules('لاته لاته',menu);
+ assert.equal(repeated.items.length,0);
+ assert.equal(repeated.unresolved[0].reason,'repeated_mention');
+});
