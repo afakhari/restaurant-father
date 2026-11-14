@@ -1,5 +1,5 @@
 # طراحی فنی دستیار ثبت سفارش با زبان طبیعی | ShiftYar
-**وضعیت:** پیشنهاد معماری پیش از پیاده‌سازی، ۲۰۲۶-۱۱-۱۴  
+**وضعیت:** قرارداد فنی اولیه (۱۴ نوامبر ۲۰۲۶)، بخشی از آن در PR شماره ۱۵ پیاده‌سازی شده است. این سند همچنان هدف معماری و محدودیت‌های تولید را از وضعیت جاری تفکیک می‌کند.  
 **شاخه مبنا:** main. سند محصول: AI_ORDER_INTAKE_SPEC.fa.md. آزمون: AI_ORDER_TEST_PLAN.fa.md.  
 **محدودیت اصلی:** مدل اجازه اجرای SQL، تغییر سفارش، انتخاب قیمت، پرداخت، ارسال مستقیم به آشپزخانه یا مشاهده اطلاعات دیگر رستوران‌ها ندارد.
 
@@ -132,3 +132,11 @@ Browser (table-scoped draft/typed note) → authenticated POST /api/ai/order-sug
 - Final `POST /api/rounds` now optionally checks `expectedPriceToman`; a changed menu price returns HTTP 409 before insertion.
 - Tests: `tests/ai-order.test.mjs`, `tests/ai-golden.test.mjs`, integration tests and real-browser scripted acceptance.
 - Architecture limitations: local parser is not AI; provider-backed inference has not been verified with a real external model. Distributed rate limiting, durable offline drafts, multilingual speech-to-text, live allergen verification and extensive field trials remain out of scope. A robust 100K-user deployment needs more than this MVP.
+
+## ۱۰. وضعیت پیاده‌سازی و تفاوت با طرح اولیه
+
+کد عملیاتی این فاز در `src/ai-order.mjs`، `src/server.mjs`، `src/public/app.js` و `src/operations.mjs` قرار دارد. API جدید به رستوران، میز، نشست و نسخه متن وابسته است. نمونه‌های نامعتبر با دلیل بازگردانده می‌شوند؛ متن بدون شاهد و بخش حذف‌شده از سفارش در حالت نیازمند بررسی ظاهر می‌شود. قیمت مورد انتظار هنگام ثبت نهایی دوباره کنترل می‌شود. با `AI_ORDER_ENABLED=false` می‌توان پیشنهادها را متوقف کرد، بدون آنکه ثبت دستی مختل شود.
+
+**تفاوت‌های باقی‌مانده با هدف تولیدی:** پاسخ مدل فعلاً با JSON parse و validator داخلی بررسی می‌شود و Structured Outputs مخصوص یک ارائه‌دهنده انتخاب نشده است. بودجه و محدودکننده‌ها در حافظه هر پردازش‌اند، نه در لایه توزیع‌شده. متن آزاد به‌صورت دائمی ذخیره نمی‌شود؛ پس از بسته‌شدن تب بازیابی تضمین‌شده نیست. اثرانگشت منو در پاسخ وجود دارد، اما قیمت و موجودی هر قلم در تراکنش ثبت نهایی دوباره بررسی می‌شوند؛ سازوکار مستقلی برای هشدار بر اثر هر تغییر غیرمرتبط منو اجرا نشده است. تشخیص گفتار، تضمین شرایط حساسیت غذایی، تأیید قابلیت API واقعی برای ایران و آزمون واقعی کاربران عملیاتی هنوز انجام نشده‌اند.
+
+این وضعیت باید در تحویل بیان شود؛ «طراحی قابل اجرا و تست‌شده با mock» به معنی «آماده تولید در رستوران واقعی» نیست.
