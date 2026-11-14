@@ -2,8 +2,8 @@
   "version": 1,
   "locale": "fa-IR",
   "sourceMenu": "scripts/seed.mjs (Narenj fixture)",
-  "status": "14 deterministic Persian cases executed as unit regression; external AI provider not executed; other examples are review references",
-  "guidance": "Semantic expectation examples, not automatic claims of model accuracy. ExpectedUnresolved may be surfaced as a review warning; never silently ignored.",
+  "status": "Rule-based selected examples are exercised in tests/ai-golden.test.mjs; real-provider not evaluated. Full corpus requires human review.",
+  "guidance": "Expected semantic cases for implementation review, not claims of LLM accuracy. Unmatched phrases and safety flags require explicit handling before confirmation.",
   "cases": [
     {
       "id": "FA01",
