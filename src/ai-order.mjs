@@ -42,7 +42,10 @@ export function parseOrderRules(text,menu){
   const key=orderKey(segment);
   const matched=menu.filter(m=>m.available&&key.includes(orderKey(m.name))).sort((a,b)=>orderKey(b.name).length-orderKey(a.name).length);
   if(matched.length){
-   const item=matched[0],nameKey=orderKey(item.name),qty=numberBefore(segment,nameKey);
+   const item=matched[0],nameKey=orderKey(item.name);
+   if(matched.length>1){unresolved.push(issue(segment,'multiple_menu_items',matched.map(m=>m.id)));continue;}
+   if(key.split(nameKey).length>2){unresolved.push(issue(segment,'repeated_mention',[item.id]));continue;}
+   const qty=numberBefore(segment,nameKey);
    if(!Number.isInteger(qty)||qty<1||qty>20){unresolved.push(issue(segment,'invalid_quantity'));continue;}
    const after=key.slice(key.indexOf(nameKey)+nameKey.length).trim();
    let note='',specificCount=0;
