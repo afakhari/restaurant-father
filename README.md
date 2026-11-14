@@ -96,7 +96,8 @@ A **manager-only stockout/exception path** permits cancelling queued, preparing 
 | POST | `/api/sessions/:id/discount` | Cashier, manager | Set integer discount using expected version |
 | POST | `/api/sessions/:id/checkout` | Cashier, manager | Validate full handoff, register counter payment, close table |
 | POST | `/api/sessions/:id/void` | Manager | Close an all-cancelled session without charging and with a reason |
-| POST | `/api/ai/parse` | Waiter, manager | Optional constrained Persian note parsing, no writes |
+| POST | `/api/ai/order-suggestions` | Waiter, manager | Table-scoped, editable Persian suggestions; no writes |
+| POST | `/api/ai/parse` | Waiter, manager | Legacy optional constrained Persian note parsing, no writes |
 | GET | `/api/health` | Public | DB liveness only, no tenant data |
 
 All write endpoints require `Content-Type: application/json` and an `Origin` matching `PUBLIC_ORIGIN`. Errors return JSON `{error:{code,message,traceId}}`; conflicts use HTTP 409. UI refreshes every five seconds and displays errors rather than implying a write succeeded.
@@ -106,6 +107,16 @@ All write endpoints require `Content-Type: application/json` and an `Origin` mat
 The optional **Persian order note parser** only converts a free-form note into menu item IDs, quantities, and per-item notes. It cannot set prices, perform writes, or auto-approve a round. The server provides only current tenant menu IDs/names to an OpenAI-compatible chat endpoint, constrains output and checks IDs against the menu again. Staff review and edit the result before adding it to the draft. Provider timeout/failure returns a visible message; manual selection continues.
 
 To activate: set `AI_API_URL` (a trusted HTTPS `/chat/completions` endpoint), `AI_API_KEY` and `AI_MODEL` in `.env`, then restart. The UI intentionally does **not** mislabel rule-based keyword matching as AI. Manually entered Persian/Arabic-Indic quantities in an AI suggestion are normalized and validated *before* confirmation. No key means this optional capability is disabled. Do not store customer identity or payment data in AI prompts.
+
+### Editable Persian order intake
+
+The waiter or manager selects the table, types a Persian description, and requests a **proposal**. The preview shows menu items, quantities and separate notes for each preparation. Every line can be edited, split, removed or replaced, and ambiguous/unavailable phrases are displayed for explicit resolution or dismissal. **Approving a suggestion adds items only to the local draft.** Only the separate **ثبت نوبت و ارسال به آشپزخانه** action submits \`/api/rounds\`.
+
+The scoped \`POST /api/ai/order-suggestions\` endpoint accepts \`{tableId,expectedSessionId,clientRequestId,sourceRevision,note}\`. Its response includes \`items\`, \`unresolved\`, \`source\`, a table/session/menu context, and \`requiresConfirmation:true\`. Table/tenant checks and menu ID validation run on the server. Stale browser requests are discarded. At most 12 order lines and 20 units per line are permitted; invalid/overflowed items must be reported rather than dropped silently. \`expectedPriceToman\` on the final order (when supplied) prevents silent repricing: a change returns HTTP 409 \`MENU_PRICE_CHANGED\` for staff review.
+
+With no approved, configured LLM service, **تطبیق ساده با منو** is a deliberately limited deterministic parser for clear menu phrases. It is explicitly labeled non-AI and leaves ambiguous language for staff. A real model requires \`AI_API_URL\`, \`AI_API_KEY\` and \`AI_MODEL\`, with independent permission and budget checks for service to Iranian users. No API key is sent to the browser; do not enter customer phone numbers or card information. Manual ordering remains available when the provider is disabled or fails. The old \`/api/ai/parse\` endpoint remains temporarily for compatibility.
+
+Design and acceptance material: [product specification](docs/AI_ORDER_INTAKE_SPEC.fa.md), [technical API](docs/AI_ORDER_TECHNICAL_DESIGN.md), [RTL wireframe](docs/AI_ORDER_UX_WIREFRAME.fa.md), [test plan](docs/AI_ORDER_TEST_PLAN.fa.md), [provider feasibility](docs/AI_PROVIDER_FEASIBILITY.fa.md), and [36 Persian examples](tests/fixtures/ai-order-golden.fa.json). These examples are reference data, not a claimed real-provider accuracy benchmark.
 
 ## Verification
 
