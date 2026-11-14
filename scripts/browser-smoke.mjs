@@ -98,13 +98,32 @@ try {
   await login('waiter@narenj.demo');
   await page.locator('.table-tile').first().waitFor();
   assert.ok((await page.locator('.table-tile').count()) >= 8, 'Initial demo must open busy central branch, not an empty branch');
-  await snap('02-waiter-hall');
+  // Filtering must preserve search focus instead of remounting the whole page.
+   const search=page.locator('#menu-search');
+   await search.fill('چا');
+   assert.equal(await page.evaluate(()=>document.activeElement?.id),'menu-search','Search should retain keyboard focus');
+   assert.ok(await page.locator('.menu-item').count()>0,'Live search should find menu entries');
+   await search.fill('');
+   await page.evaluate(()=>document.querySelector('#menu-search').dataset.identity='stable');
+   await page.locator('.cat-chip').nth(1).click();
+   assert.equal(await search.getAttribute('data-identity'),'stable','Changing category should not remount search');
+   await page.locator('.cat-chip').first().click();
+   assert.equal(await search.getAttribute('data-identity'),'stable','Resetting category should not remount search');
+   await snap('02-waiter-hall');
   await chooseTable(8);
   await sendRound('چای زعفرانی');
   await sendRound('لیموناد'); // Two rounds in the SAME table session.
   const rounds = await page.locator('.round-sep').count();
   assert.equal(rounds, 2, 'Table eight must retain both distinct rounds');
-  await snap('03-waiter-two-rounds');
+  // Adding a menu item should not reset a scrolled menu to its beginning.
+   const lastAvailable=page.locator('.menu-list button.add:not([disabled])').last();
+   await lastAvailable.scrollIntoViewIfNeeded();
+   const menuBefore=await page.locator('.menu-list').evaluate(el=>el.scrollTop);
+   await lastAvailable.click();
+   const menuAfter=await page.locator('.menu-list').evaluate(el=>el.scrollTop);
+   assert.ok(Math.abs(menuAfter-menuBefore)<=2,'Adding a dish must preserve menu scroll');
+   await page.locator('.draft-line [data-action="remove-draft"]').last().click();
+   await snap('03-waiter-two-rounds');
   await logout();
 
   await login('kitchen@narenj.demo');
@@ -130,7 +149,18 @@ try {
   const checkout = page.locator('button[data-action="checkout"]');
   assert.equal(await checkout.isDisabled(), false, 'Fully delivered table must be payable');
   await snap('08-cashier-bill');
-  await page.locator('#discount-input').fill('۱۰٬۰۰۰');
+  // Tender choice must retain discount input, its value and DOM identity.
+   await page.locator('#discount-input').fill('۱۲٬۰۰۰');
+   await page.evaluate(()=>document.querySelector('#discount-input').dataset.identity='stable');
+   await page.locator('[data-action="pay-method"][data-id="cash"]').click();
+   assert.equal(await page.locator('#discount-input').inputValue(),'۱۲٬۰۰۰');
+   assert.equal(await page.locator('#discount-input').getAttribute('data-identity'),'stable');
+   assert.equal(await page.locator('[data-action="pay-method"][data-id="cash"]').getAttribute('aria-pressed'),'true');
+   await page.locator('.cash-table.selected').click();
+   assert.equal(await page.locator('#discount-input').inputValue(),'۱۲٬۰۰۰','Bill refresh must preserve unsubmitted discount');
+   assert.match(await page.locator('#discount-hint').innerText(),/هنوز ثبت نشده/,'Cashier must know discount is pending');
+
+   await page.locator('#discount-input').fill('۱۰٬۰۰۰');
   await page.locator('[data-action="discount"]').click();
   await page.locator('[data-action="checkout"]').click();
   await page.locator('#action-dialog[open]').waitFor();
@@ -242,6 +272,20 @@ try {
       await rolePage.screenshot({path:path.join(output,role.startsWith('kitchen')?'14-mobile-kitchen.png':'15-mobile-cashier.png'),fullPage:true});
     }finally{await roleCtx.close();}
   }
+  // The manager's draft must not survive navigation confirmation or cross-tenant sign-in.
+  await login('manager@narenj.demo');
+  await chooseTable(3);
+  await page.locator('.menu-list button.add:not([disabled])').first().click();
+  assert.equal(await page.locator('.draft-line').count(),1,'Demo draft must exist before leaving hall');
+  await page.locator('.nav-btn[data-id="kitchen"]').click(); // Global dialog handler accepts discard.
+  await page.locator('.nav-btn[data-id="hall"]').click();
+  assert.equal(await page.locator('.draft-line').count(),0,'Confirmed navigation must actually discard the draft');
+  await page.locator('.menu-list button.add:not([disabled])').first().click();
+  await logout(); // Unsaved-work confirmation is accepted by the test dialog listener.
+  await login('manager@darband.demo');
+  assert.equal(await page.locator('.draft-line').count(),0,'Previous tenant must never leak draft items');
+  assert.equal(await page.locator('body').textContent().then(t=>t.includes('چای زعفرانی')),false,'Previous tenant menu must stay isolated');
+  await logout();
   assert.deepEqual(consoleErrors, [], 'Browser must not raise uncaught JS errors');
   await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify({passed:true,rounds,roles:['waiter','kitchen','cashier','manager'],stages:['order','prepare','ready','serve','checkout','tenant-isolation','mobile-steps','draft-loss-prevention','responsive-matrix','persian-discount','manager-void','split-notes','arabic-keyboard-search'],consoleErrors},null,2));
   finalized = true;

@@ -280,3 +280,10 @@ button:disabled{cursor:not-allowed}
   .mobile-draft-bar .btn{font-weight:720}
   .view-title h1{font-size:22px}
 }
+
+/* Keep interactions stable: preserve menu reading position and target mobile details. */
+.menu-list{overscroll-behavior:contain;scrollbar-gutter:stable}
+.hall-steps,.cash-bill{scroll-margin-block-start:16px}
+.cash-table[aria-pressed="true"]{box-shadow:inset 0 0 0 1px var(--ink)}
+@media(max-width:850px){.cash-bill{scroll-margin-top:16px}}
+@media(max-width:1000px){.hall-steps{scroll-margin-top:8px}}
