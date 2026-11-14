@@ -6,10 +6,16 @@ import {withTenant,requireSession,lockTable,getSessionItems,logEvent} from './db
 // contents. A replay must match the same table AND every individual item/note.
 async function verifiedRoundReplay(client,row,body){
  if(row.table_id!==body.tableId)throw new HttpError(409,'IDEMPOTENCY_CONFLICT','این شناسه سفارش قبلاً برای میز دیگری استفاده شده است.');
- const result=await client.query('SELECT menu_item_id,quantity,note FROM order_items WHERE round_id=$1',[row.id]);
+ const result=await client.query('SELECT menu_item_id,quantity,note,unit_price_toman FROM order_items WHERE round_id=$1',[row.id]);
  const normalize=items=>items.map(x=>JSON.stringify([x.menuItemId??x.menu_item_id,Number(x.quantity),String(x.note??'').trim()])).sort();
  if(JSON.stringify(normalize(result.rows))!==JSON.stringify(normalize(body.items))){
   throw new HttpError(409,'IDEMPOTENCY_CONFLICT','این درخواست قبلاً با اقلام یا توضیحات متفاوت ثبت شده است. سفارش جاری را بررسی کنید و درخواست تازه‌ای ثبت کنید.');
+ }
+ // When a delayed client retry adds or changes its price expectation, it must
+ // not mistake a historical charge for a freshly approved price.
+ const prices=new Map(result.rows.map(x=>[x.menu_item_id,Number(x.unit_price_toman)]));
+ if(body.items.some(x=>x.expectedPriceToman!==undefined&&prices.get(x.menuItemId)!==x.expectedPriceToman)){
+  throw new HttpError(409,'IDEMPOTENCY_CONFLICT','مبلغ مورد انتظار با سفارش ثبت‌شده قبلی سازگار نیست. صورت‌حساب میز را بررسی کنید.');
  }
  return {roundId:row.id,sessionId:row.session_id,replayed:true};
 }
