@@ -1,6 +1,6 @@
 # SCOPE | ShiftYar (شیفت‌یار)
 
-**Document status:** Assessment scope with a dated change log, revised 2026-11-14. The original scope was recorded on 2026-11-13 before implementation; Git history is the record of its original wording. This revised document makes the acceptance contract clearer and distinguishes subsequent work. **The assessment's six-hour active-work limit is a requirement, not a claim about actual elapsed work.** The candidate must report actual time honestly.
+**Document status:** Assessment scope with a dated change log, revised 2026-11-14. The original scope was recorded on 2026-11-13 before implementation; Git history is the record of its original wording. This revised document makes the acceptance contract clearer and distinguishes subsequent work. **Time accounting (candidate-reported):** approximately **six hours of active, hands-on work in total, spread across multiple sessions**, not six continuous clock hours. Pauses, unattended AI/tool execution and deployment waiting are not counted as active work. This is a personal effort estimate, not something Git commit timestamps can independently prove.
 
 ## 1. Product thesis and customer hypothesis
 
@@ -68,7 +68,7 @@ These omissions are **product choices**, not hidden completed features. A usable
 | **Subsequent correctness/UX passes** | Manager-only started-item cancellation and all-cancelled void, role-specific API projections, stronger idempotency replay checks, localized inputs, mobile steps and draft-loss guards. These are documented changes, not evidence of field validation. |
 | **2026-11-14: follow-on order-intake enhancement** | A table/session-bound Persian text → editable proposal → explicitly approved draft workflow, unresolved phrases, deterministic non-AI menu matching, optional provider-backed inference and price-change conflicts. See docs/AI_ORDER_INTAKE_SPEC.fa.md and docs/AI_ORDER_TECHNICAL_DESIGN.md. |
 
-**Time accounting:** repository timestamps or AI output do not establish six hours of actual candidate work. Any work beyond the original assessment limit must be disclosed as follow-on or overrun, not backdated into the initial scope.
+**Time accounting:** the candidate reports **six total productive hours across non-consecutive sessions** for the work presented. The dated change log separates what was chosen first from what was refined later; chronology does not imply six hours of continuous coding or an overrun. This is a self-reported active-effort figure, not a measured stopwatch or claim that commits were all created in a single sitting.
 
 ## 8. Release gate and next learning milestone
 
