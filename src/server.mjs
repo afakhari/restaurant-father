@@ -33,12 +33,14 @@ function csrf(req){
 }
 async function suggestWithAI(user,body){
  requiredRole(user,['waiter','manager']);
+ rateLimitSuggestions(user);
  if(typeof body?.note!=='string'||body.note.trim().length<4||body.note.length>320)throw new HttpError(400,'VALIDATION','یادداشت باید ۴ تا ۳۲۰ کاراکتر باشد.');
  const endpoint=process.env.AI_API_URL,key=process.env.AI_API_KEY,model=process.env.AI_MODEL;
  if(!endpoint||!key||!model)throw new HttpError(503,'AI_UNAVAILABLE','دستیار هوشمند در این محیط فعال نیست. سفارش‌گیری دستی در دسترس است.');
  let url;try{url=new URL(endpoint);}catch{throw new HttpError(503,'AI_CONFIG','نشانی سرویس هوشمند نامعتبر است.');}
  if(url.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(url.hostname))throw new HttpError(503,'AI_CONFIG','اتصال AI باید امن باشد.');
- const menu=await withTenant(user,async client=>(await client.query('SELECT id,name,available FROM menu_items WHERE available ORDER BY name LIMIT 100')).rows);
+ const menu=await withTenant(user,async client=>(await client.query('SELECT id,name,available FROM menu_items WHERE available ORDER BY name')).rows);
+ if(menu.length>200)throw new HttpError(422,'AI_MENU_LIMIT','منوی بزرگ باید به صورت دستی بررسی شود؛ هیچ غذا به‌صورت پنهانی حذف نمی‌شود.');
  const context=menu.map(x=>({id:x.id,name:x.name}));
  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),Math.min(7000,Math.max(1000,Number(process.env.AI_TIMEOUT_MS)||4500)));
  try{
