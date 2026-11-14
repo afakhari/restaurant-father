@@ -53,6 +53,44 @@ let finalized = false;
 try {
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   await page.locator('#login-form').waitFor();
+  // Verify the real served font, legible core design tokens, and visible focus states.
+  const typography = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const fontResponse = await fetch('/fonts/vazirmatn-arabic.woff2');
+    const style = getComputedStyle(document.body);
+    const root = getComputedStyle(document.documentElement);
+    const luminance = (hex) => {
+      const rgb = hex.match(/[0-9a-f]{2}/gi)?.slice(0, 3).map(x => parseInt(x, 16) / 255);
+      if (!rgb || rgb.length !== 3) return 0;
+      return rgb.map(x => x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4)
+        .reduce((sum, x, i) => sum + x * [.2126, .7152, .0722][i], 0);
+    };
+    const contrast = (a, b) => {
+      const x = luminance(a), y = luminance(b);
+      return (Math.max(x, y) + .05) / (Math.min(x, y) + .05);
+    };
+    const palette = Object.fromEntries(['--ink','--muted','--paper','--cream','--accent-deep']
+      .map(key => [key, root.getPropertyValue(key).trim()]));
+    return {
+      fontStatus: fontResponse.status,
+      fontMime: fontResponse.headers.get('content-type'),
+      family: style.fontFamily,
+      loaded: document.fonts.check('400 14px "Vazirmatn UI"', 'شیفت‌یار'),
+      bodyWeight: style.fontWeight,
+      palette,
+      textContrast: contrast(palette['--ink'], palette['--paper']),
+      secondaryContrast: contrast(palette['--muted'], palette['--cream']),
+      accentContrast: contrast(palette['--accent-deep'], palette['--paper']),
+    };
+  });
+  assert.equal(typography.fontStatus, 200, 'Persian font must be served by this app');
+  assert.match(typography.fontMime ?? '', /font\/woff2/, 'Font must have the correct MIME type');
+  assert.match(typography.family, /Vazirmatn UI/, 'Local Persian font must be first in the font stack');
+  assert.equal(typography.loaded, true, 'Persian font must finish loading');
+  assert.ok(typography.textContrast >= 7, 'Primary ink should have AAA contrast');
+  assert.ok(typography.secondaryContrast >= 4.5, 'Secondary text must be readable on the app background');
+  assert.ok(typography.accentContrast >= 4.5, 'Editorial accent text must be readable');
+  console.log('VISUAL_SYSTEM_PASS', JSON.stringify(typography));
   await snap('01-login');
   await login('waiter@narenj.demo');
   await page.locator('.table-tile').first().waitFor();
@@ -149,6 +187,8 @@ try {
     const mobilePage = await mobile.newPage();
     mobilePage.on('pageerror', e => consoleErrors.push(e.message));
     await mobilePage.goto(origin, { waitUntil: 'domcontentloaded' });
+    await mobilePage.locator('#login-form').waitFor();
+    await mobilePage.screenshot({path:path.join(output,'11a-mobile-login.png'),fullPage:true});
     await mobilePage.locator('#email').fill('waiter@narenj.demo');
     await mobilePage.locator('#password').fill(password);
     await mobilePage.locator('#login-submit').click();
