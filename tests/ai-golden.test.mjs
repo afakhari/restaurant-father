@@ -30,6 +30,6 @@ for(const id of selected){
  });
 }
 test('golden corpus is not a fabricated real-provider evaluation',()=>{
- assert.equal(fixture.status.includes('not executed'),true);
+ assert.equal(fixture.status.includes('real-provider not evaluated'),true);
  assert.equal(fixture.cases.length,36);
 });
