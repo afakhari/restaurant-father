@@ -2,6 +2,12 @@
 
 **Status:** GitHub repository and Docker Compose recipe prepared. **No live HTTPS deployment has been completed or verified by the authoring environment.** A public URL cannot be invented; neither can credentials for an unprovisioned host.
 
+## Free-tier reviewer demo (recommended)
+
+Use the root [render.yaml](render.yaml) for a **free Render web service** and a **separate Neon free-tier PostgreSQL database**. See [docs/FREE_DEMO_DEPLOY.fa.md](docs/FREE_DEMO_DEPLOY.fa.md) for the complete, ordered procedure, GitHub Actions bootstrap and HTTPS verification.
+
+The web service receives only `DATABASE_URL` for the unprivileged `restaurant_runtime` role; `ADMIN_DATABASE_URL`, `DB_APP_PASSWORD` and `DEMO_PASSWORD` must not be stored in Render runtime environment variables. `PUBLIC_ORIGIN` is wired to the Render-generated HTTPS URL, and secure cookies are enabled. No live URL, Neon database or Render service has been created or claimed by this repository.
+
 ## Local reproducible environment
 
 Run `docker compose up --build`. The migration container uses `ADMIN_DATABASE_URL`; the running app uses `DATABASE_URL` for the restricted `restaurant_runtime` role. The demo seeder is explicitly enabled only in the local compose recipe.

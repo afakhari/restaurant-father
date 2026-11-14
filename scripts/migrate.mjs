@@ -7,8 +7,13 @@ if (!adminUrl || !appPassword) throw new Error('ADMIN_DATABASE_URL and DB_APP_PA
 const pool = new pg.Pool({ connectionString: adminUrl });
 const qlit = (s) => `'${s.replaceAll("'", "''")}'`;
 try {
-  const roleExists = await pool.query("SELECT 1 FROM pg_roles WHERE rolname='restaurant_runtime'");
-  if (!roleExists.rowCount) await pool.query(`CREATE ROLE restaurant_runtime LOGIN PASSWORD ${qlit(appPassword)} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`);
+  // An ordinary SQL-created role defaults to NO SUPERUSER, NO BYPASSRLS,
+  // NO CREATEDB and NO CREATEROLE. Explicit negative superuser attributes may
+  // be disallowed for delegated CREATEROLE users on managed Postgres (Neon).
+  const role = await pool.query("SELECT rolsuper,rolbypassrls,rolcreatedb,rolcreaterole FROM pg_roles WHERE rolname='restaurant_runtime'");
+  if (role.rowCount && Object.values(role.rows[0]).some(Boolean))
+    throw new Error('Existing restaurant_runtime role is privileged; refusing to use it for the public app');
+  if (!role.rowCount) await pool.query(`CREATE ROLE restaurant_runtime LOGIN PASSWORD ${qlit(appPassword)}`);
   else await pool.query(`ALTER ROLE restaurant_runtime PASSWORD ${qlit(appPassword)}`);
   const migration = await fs.readFile(new URL('../db/001_initial.sql', import.meta.url), 'utf8');
   await pool.query(migration);

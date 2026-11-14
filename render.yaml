@@ -1,0 +1,22 @@
+# Free reviewer demo. PostgreSQL is hosted on Neon, NOT on Render.
+# No admin DB URL or demo password belongs in this web-service environment.
+services:
+  - type: web
+    name: restaurant-father-demo
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: PUBLIC_ORIGIN
+        fromService:
+          name: restaurant-father-demo
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: DATABASE_URL
+        sync: false
