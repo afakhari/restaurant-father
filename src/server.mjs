@@ -11,7 +11,7 @@ import {addRound,transitionItem,setDiscount,checkout,voidSession} from './operat
 import {limitLogin} from './rate-limit.mjs';
 import {validateOrderRequest,parseOrderRules,validateModelSuggestion,safeOrderSuggestions} from './ai-order.mjs';
 
-const featureFlags=()=>({aiEnabled:Boolean(process.env.AI_API_URL&&process.env.AI_API_KEY&&process.env.AI_MODEL),orderSuggestionsEnabled:true});
+const featureFlags=()=>({aiEnabled:process.env.AI_ORDER_ENABLED!=='false'&&Boolean(process.env.AI_API_URL&&process.env.AI_API_KEY&&process.env.AI_MODEL),orderSuggestionsEnabled:process.env.AI_ORDER_ENABLED!=='false'});
 const staticDir=path.join(path.dirname(fileURLToPath(import.meta.url)),'public');
 const staticMap={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css','/iran-locale.js':'iran-locale.js'};
 const fontFiles={'/fonts/vazirmatn-arabic.woff2':'vazirmatn-arabic-wght-normal.woff2','/fonts/vazirmatn-latin.woff2':'vazirmatn-latin-wght-normal.woff2'};
@@ -59,19 +59,26 @@ async function suggestWithAI(user,body){
 }
 
 // Request-bound intake is distinct from order creation and has no database writes.
-const orderSuggestionCalls=new Map();
+const orderSuggestionCalls=new Map(),orderTenantDailyCalls=new Map();
 function rateLimitSuggestions(user){
  const now=Date.now(),key=user.restaurantId+':'+user.id;
  for(const [k,v] of orderSuggestionCalls)if(v.until<=now)orderSuggestionCalls.delete(k);
+ const day=new Date(now).toISOString().slice(0,10),tenantKey=user.restaurantId+':'+day;
+ for(const k of orderTenantDailyCalls.keys())if(!k.endsWith(':'+day))orderTenantDailyCalls.delete(k);
+ const dailyLimit=Math.min(5000,Math.max(10,Number(process.env.AI_DAILY_REQUEST_LIMIT)||200));
+ if((orderTenantDailyCalls.get(tenantKey)??0)>=dailyLimit)throw new HttpError(429,'AI_DAILY_LIMIT','سقف روزانه تحلیل سفارش این رستوران پر شده است؛ از ثبت دستی استفاده کنید.');
  const item=orderSuggestionCalls.get(key)??{until:now+300000,count:0};
  if(item.count>=20)throw new HttpError(429,'AI_RATE_LIMIT','تعداد درخواست‌های تحلیل زیاد است؛ کمی بعد دوباره تلاش کنید یا از منوی دستی استفاده کنید.');
  item.count++;orderSuggestionCalls.set(key,item);
+ orderTenantDailyCalls.set(tenantKey,(orderTenantDailyCalls.get(tenantKey)??0)+1);
 }
 async function modelOrderSuggestions(text,menu){
  const urlString=process.env.AI_API_URL,key=process.env.AI_API_KEY,model=process.env.AI_MODEL;
  let target;try{target=new URL(urlString);}catch{throw new HttpError(503,'AI_CONFIG','تنظیمات سرویس هوشمند معتبر نیست.');}
  const localAllowed=process.env.NODE_ENV==='test'&&['127.0.0.1','localhost'].includes(target.hostname);
- if((target.protocol!=='https:'&&!localAllowed)||target.username||target.password)throw new HttpError(503,'AI_CONFIG','نشانی سرویس هوشمند امن نیست.');
+ const blockedHost=/^(?:localhost|.+\.localhost|.+\.local|.+\.internal|.+\.test)$/i.test(target.hostname)||/^\[/.test(target.hostname)||/^\d+\.\d+\.\d+\.\d+$/.test(target.hostname);
+ const allowHosts=(process.env.AI_ALLOWED_HOSTS??'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
+ if((target.protocol!=='https:'&&!localAllowed)||(!localAllowed&&blockedHost)||target.username||target.password||(allowHosts.length&&!allowHosts.includes(target.hostname.toLowerCase())))throw new HttpError(503,'AI_CONFIG','نشانی سرویس هوشمند امن یا مجاز نیست.');
  if(menu.length>200)throw new HttpError(422,'AI_MENU_LIMIT','منو برای تحلیل هم‌زمان بسیار بزرگ است؛ فعلاً از جست‌وجوی دستی استفاده کنید.');
  const controller=new AbortController(),limit=Math.min(7000,Math.max(1500,Number(process.env.AI_TIMEOUT_MS)||4500));
  const timer=setTimeout(()=>controller.abort(),limit);
@@ -100,6 +107,7 @@ async function modelOrderSuggestions(text,menu){
 }
 async function suggestOrder(user,body){
  requiredRole(user,['waiter','manager']);
+ if(process.env.AI_ORDER_ENABLED==='false')throw new HttpError(503,'ORDER_SUGGESTIONS_DISABLED','پیشنهاد سفارش در این محیط غیرفعال است؛ ثبت دستی در دسترس است.');
  const request=validateOrderRequest(body);
  rateLimitSuggestions(user);
  const ctx=await withTenant(user,async client=>{
