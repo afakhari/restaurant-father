@@ -35,7 +35,7 @@
 - User passwords are salted with scrypt; sessions use random 256-bit tokens stored only as SHA-256 digests, with 12-hour expiry and logout revocation.
 - SameSite=Strict, HttpOnly, optional Secure cookies; JSON-only writes and a matching Origin. Set `PUBLIC_ORIGIN` and `COOKIE_SECURE=true` for HTTPS.
 - Security headers: no framing, restrictive CSP, no sniffing, no referrer. UI escapes database-controlled text prior to rendering.
-- Bounded 64 KiB JSON requests; AI note max 320 chars; no secrets or full food notes in request logs; trace ID on errors.
+- Bounded 64 KiB JSON requests; the new table-scoped suggestion API accepts up to 800 characters (legacy parser: 320). Obvious phone/card numbers are rejected before external inference, but this is not a comprehensive DLP guarantee. No provider keys or raw order notes are written to request logs; errors include a trace ID.
 - **Not implemented:** MFA, credential reset, distributed edge rate limiting, alerting backend, strong branch-specific RBAC, HSTS from reverse proxy, audit export, retention policy, production backups, disaster recovery, stress/load testing, external security assessment. These are requirements for a real customer deployment, not hidden deliverables.
 
 **Login throttling:** the Node process now caps attempts per remote IP and email within a 15-minute window. This is memory-only and is not sufficient for a multi-replica or Internet-exposed service without trusted-edge throttling and monitoring.
@@ -63,3 +63,12 @@ A fully cancelled table is closed only by a manager and only with a logged reaso
 **Idempotency content integrity:** replay keys must match the same table **and** an equivalent set of item IDs, quantities and separate preparation notes. Reusing a key with edited contents returns HTTP 409 rather than pretending that the edited order was saved. Concurrency tests cover changed quantities and notes.
 
 **Contract compatibility:** active-session response projections retain a nonsensitive `version` counter for waiter and kitchen actions, so clients can detect stale operations without revealing payment fields.
+
+## 6. Scoped Persian order suggestions and bounded provider access
+
+A typed order is never a transaction. The new `/api/ai/order-suggestions` endpoint authenticates a waiter/manager, checks the selected table and live session within FORCE RLS, and returns proposed menu items and explicit unresolved portions only. The UI ties the response to a request UUID, text revision, table, branch and session; a changed context invalidates the proposal. The old `/api/ai/parse` endpoint remains available only for compatibility and is also rate-limited.
+
+The model response is untrusted: the validator checks actual tenant menu membership, availability, integer quantities 1–20, note bounds, a maximum of 12 accepted lines, source-text evidence, omitted clauses and possible unit-level preparation ambiguity. Invalid or unexplained suggestions remain visible for staff review. All text inserted into the UI is HTML-escaped. No model output authorizes payment, changes a price or writes to the kitchen. Final `/api/rounds` uses server-side menu and price snapshots and returns `409 MENU_PRICE_CHANGED` when a supplied expected price differs; replayed keys are checked against the original order content and expected price.
+
+Provider requests reject redirects, non-HTTPS remote URLs, local/private-style hostname targets, and optionally enforce `AI_ALLOWED_HOSTS`. Requests use a timeout and maximum response size. Operators can disable both suggestion endpoints using `AI_ORDER_ENABLED=false`. An in-process limit allows 20 suggestions per employee per five minutes, 2 simultaneous model requests per employee, and 200 tenant requests per UTC day by default. **These local limits are not a shared distributed quota or a substitute for a provider billing ceiling.** Model-inference operations for restaurants in Iran require separate provider eligibility verification. Mocked tests do not establish real model accuracy, legality, or privacy guarantees.
+
