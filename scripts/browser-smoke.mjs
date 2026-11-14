@@ -140,6 +140,19 @@ try {
   await page.locator('#ai-note').fill('دو چیزکیک');
   assert.equal(await page.locator('.ai-review-line').count(),0,'Changing source text invalidates a stale suggestion');
   await page.locator('[data-action="ai-clear"]').click();
+  // An old delayed response cannot be used after changing the selected table.
+  await page.route('**/api/ai/order-suggestions',async route=>{
+    await new Promise(resolve=>setTimeout(resolve,350));
+    await route.continue().catch(()=>{});
+  });
+  await page.locator('#ai-note').fill('دو تا لاته');
+  await page.locator('[data-action="ai-parse"]').click();
+  await chooseTable(3);
+  await page.waitForTimeout(600);
+  assert.equal(await page.locator('.ai-review-line').count(),0,'Old table suggestions must not be actionable');
+  assert.equal(await page.locator('#ai-note').inputValue(),'','Switching tables clears the former table note');
+  await page.unroute('**/api/ai/order-suggestions');
+  await chooseTable(8);
   await sendRound('چای زعفرانی');
   await sendRound('لیموناد'); // Two rounds in the SAME table session.
   const rounds = await page.locator('.round-sep').count();
@@ -274,6 +287,21 @@ try {
     await mobilePage.locator('#menu-search').fill('');
     await mobilePage.locator('.hall-step[data-id="order"]').click();
     assert.equal(await mobilePage.locator('[data-draft-note="1"]').inputValue(),'یکی بدون یخ');
+    await mobilePage.locator('#ai-note').fill('دو تا لاته، یکی کم‌شیر و نوشابه');
+    await mobilePage.locator('[data-action="ai-parse"]').click();
+    await mobilePage.locator('.ai-review-line').first().waitFor();
+    assert.equal(await mobilePage.locator('.ai-review-line').count(),2,'Mobile review must split distinct preparation notes');
+    assert.equal(await mobilePage.locator('.ai-unresolved-item').count(),1,'Unknown order text must remain visible');
+    for(const width of [320,390]){
+      await mobilePage.setViewportSize({width,height:844});
+      const size=await mobilePage.evaluate(()=>({viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth}));
+      assert.ok(size.scrollWidth<=size.viewport+2,'AI review overflows narrow screen: '+JSON.stringify(size));
+    }
+    await mobilePage.setViewportSize({width:390,height:844});
+    await mobilePage.screenshot({path:path.join(output,'13a-mobile-ai-review.png'),fullPage:true});
+    await mobilePage.locator('[data-action="ai-dismiss"]').click();
+    await mobilePage.locator('[data-action="ai-apply"]').click();
+    assert.equal(await mobilePage.locator('.draft-line').count(),4,'Mobile AI adds to the existing manual draft');
     await mobilePage.screenshot({path:path.join(output,'13-mobile-order-review.png'),fullPage:true});
     // A navigation across tables must not silently discard a typed draft.
     await mobilePage.locator('.hall-step[data-id="tables"]').click();
