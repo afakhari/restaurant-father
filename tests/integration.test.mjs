@@ -61,6 +61,12 @@ test('parallel round additions survive, retries are idempotent, tenant cannot al
  assert.equal(editedQuantity.body.error.code,'IDEMPOTENCY_CONFLICT');
  const editedNote=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],note:'بدون یخ'}]});
  assert.equal(editedNote.status,409,'same retry key with changed note cannot lose a preparation instruction');
+ const replayPrice=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],expectedPriceToman:Number(drinks.price_toman)}]});
+ assert.equal(replayPrice.status,201,'correct expected historical price should be replayable');
+ assert.equal(replayPrice.body.replayed,true);
+ const wrongPriceReplay=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],expectedPriceToman:Number(drinks.price_toman)+1000}]});
+ assert.equal(wrongPriceReplay.status,409,'a changed expected price must not succeed as a replay');
+ assert.equal(wrongPriceReplay.body.error.code,'IDEMPOTENCY_CONFLICT');
  // Reusing the same idempotency key on a different table must NOT silently return the old round.
  const otherTable=A.tables.find(x=>x.id!==t.id);
  const wrongTable=await request('waiter','POST','/api/rounds',{...payloadA,tableId:otherTable.id,expectedSessionId:null});
@@ -158,6 +164,95 @@ test('AI response is constrained to current restaurant menu and requires staff c
  }
 });
 
+
+
+test('new order suggestions stay bound to table, tenant and role and never write rounds',async()=>{
+ const saved=[process.env.AI_API_URL,process.env.AI_API_KEY,process.env.AI_MODEL];
+ delete process.env.AI_API_URL;delete process.env.AI_API_KEY;delete process.env.AI_MODEL;
+ try{
+  const before=(await shift('waiter')).body;
+  const table=before.tables.find(t=>t.number===3&&sessionFor(before,t.id));
+  assert.ok(table);
+  const session=sessionFor(before,table.id);
+  const payload={tableId:table.id,expectedSessionId:session.id,clientRequestId:crypto.randomUUID(),sourceRevision:3,note:'دو لاته، یکی کم‌شیر'};
+  const result=await request('waiter','POST','/api/ai/order-suggestions',payload);
+  assert.equal(result.status,200,JSON.stringify(result.body));
+  assert.equal(result.body.source,'rules');
+  assert.equal(result.body.requiresConfirmation,true);
+  assert.equal(result.body.context.tableId,table.id);
+  assert.equal(result.body.context.sessionId,session.id);
+  assert.equal(result.body.context.sourceRevision,3);
+  assert.equal(result.body.items.length,2);
+  assert.equal(result.body.items.reduce((sum,i)=>sum+i.quantity,0),2);
+  assert.equal(result.body.items.filter(i=>i.note).length,1);
+  const after=(await shift('waiter')).body;
+  assert.equal(after.rounds.length,before.rounds.length,'suggestion must not write orders');
+  assert.equal((await request('kitchen','POST','/api/ai/order-suggestions',payload)).status,403);
+  assert.equal((await request('other','POST','/api/ai/order-suggestions',payload)).status,404);
+  assert.equal((await request('waiter','POST','/api/ai/order-suggestions',{...payload,expectedSessionId:null})).status,409);
+  const invalid=await request('waiter','POST','/api/ai/order-suggestions',{...payload,note:'شماره 09121234567 را ذخیره کن'});
+  assert.equal(invalid.status,422);
+ }finally{
+  for(const [name,value] of [['AI_API_URL',saved[0]],['AI_API_KEY',saved[1]],['AI_MODEL',saved[2]]]){if(value===undefined)delete process.env[name];else process.env[name]=value;}
+ }
+});
+
+test('suggestion kill switch returns a clear error without disabling manual workflow',async()=>{
+ const prior=process.env.AI_ORDER_ENABLED;process.env.AI_ORDER_ENABLED='false';
+ try{
+  const current=(await shift('waiter')).body;
+  const table=current.tables.find(t=>t.number===3&&sessionFor(current,t.id));
+  const session=sessionFor(current,table.id);
+  const r=await request('waiter','POST','/api/ai/order-suggestions',{
+   tableId:table.id,expectedSessionId:session.id,clientRequestId:crypto.randomUUID(),sourceRevision:1,note:'دو عدد لاته'
+  });
+  assert.equal(r.status,503);assert.equal(r.body.error.code,'ORDER_SUGGESTIONS_DISABLED');
+  assert.equal((await request('waiter','GET','/api/me')).body.features.orderSuggestionsEnabled,false);
+  assert.equal((await shift('waiter')).status,200);
+ }finally{if(prior===undefined)delete process.env.AI_ORDER_ENABLED;else process.env.AI_ORDER_ENABLED=prior;}
+});
+
+test('natural-language suggestions report invalid provider IDs instead of inserting them',async()=>{
+ const before=(await shift('waiter')).body;
+ const table=before.tables.find(t=>t.number===3&&sessionFor(before,t.id)),session=sessionFor(before,table.id);
+ const menuItem=before.menu.find(m=>m.available&&m.name==='لاته');
+ const remote=http.createServer((req,res)=>{
+  res.setHeader('Content-Type','application/json');
+  res.end(JSON.stringify({choices:[{message:{content:JSON.stringify({items:[
+   {menuItemId:menuItem.id,quantity:1,note:'کم‌شیر',sourceText:'یک لاته کم‌شیر'},
+   {menuItemId:crypto.randomUUID(),quantity:1,note:'',sourceText:'غذای ساختگی'},
+   {menuItemId:menuItem.id,quantity:99,note:'',sourceText:'نودونه لاته'}
+  ],unmatched:'نوشابه'})}}]}));
+ });
+ await new Promise(resolve=>remote.listen(0,'127.0.0.1',resolve));
+ const saved=[process.env.AI_API_URL,process.env.AI_API_KEY,process.env.AI_MODEL,process.env.NODE_ENV];
+ process.env.AI_API_URL='http://127.0.0.1:'+remote.address().port;
+ process.env.AI_API_KEY='local-mock-only';process.env.AI_MODEL='local-test';process.env.NODE_ENV='test';
+ try{
+  const result=await request('waiter','POST','/api/ai/order-suggestions',{tableId:table.id,expectedSessionId:session.id,clientRequestId:crypto.randomUUID(),sourceRevision:1,note:'یک لاته کم‌شیر و نوشابه'});
+  assert.equal(result.status,200,JSON.stringify(result.body));
+  assert.equal(result.body.source,'ai');
+  assert.equal(result.body.items.length,1);
+  assert.equal(result.body.unresolved.length,3);
+  assert.equal(result.body.requiresConfirmation,true);
+  assert.ok(result.body.context.menuFingerprint);
+  assert.equal((await shift('waiter')).body.rounds.length,before.rounds.length);
+ }finally{
+  [process.env.AI_API_URL,process.env.AI_API_KEY,process.env.AI_MODEL,process.env.NODE_ENV]=saved;
+  for(const name of ['AI_API_URL','AI_API_KEY','AI_MODEL','NODE_ENV'])if(process.env[name]===undefined||process.env[name]==='undefined')delete process.env[name];
+  await new Promise(resolve=>remote.close(resolve));
+ }
+});
+
+test('prices changed since preview are rejected before any round is written',async()=>{
+ const before=(await shift('waiter')).body,table=before.tables.find(t=>t.number===3&&sessionFor(before,t.id));
+ const session=sessionFor(before,table.id),item=before.menu.find(m=>m.available);
+ const count=before.rounds.length;
+ const result=await request('waiter','POST','/api/rounds',{tableId:table.id,expectedSessionId:session.id,idempotencyKey:crypto.randomUUID(),items:[{menuItemId:item.id,quantity:1,note:'',expectedPriceToman:Number(item.price_toman)+1}]});
+ assert.equal(result.status,409);
+ assert.equal(result.body.error.code,'MENU_PRICE_CHANGED');
+ assert.equal((await shift('waiter')).body.rounds.length,count);
+});
 
 test('busy historical traffic never removes an older open table from the live shift snapshot',async()=>{
  const original=(await shift('waiter')).body;

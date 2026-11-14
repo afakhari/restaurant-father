@@ -87,22 +87,31 @@ The seed contains a free **table 8**, an active mixed-state **table 3**, a previ
 
 **If you're recording on the public demo:** use the privately shared hosted credentials, not the local password; the database may already contain changes from previous reviewers. Choose an appropriate free table rather than relying on table 8 being untouched.
 
-## Optional AI-assisted Persian ordering
+## Persian order descriptions and editable proposals
 
-The waiter can describe an order in natural Persian, for example «دو تا لاته، یکی کم‌شیر، و یک چیزکیک». When an external provider is configured, the AI endpoint proposes **menu item IDs, quantities and item notes**. Staff can **review and edit the suggestions before applying them to a draft**; a second explicit order submission is still required.
+The waiter or manager selects a table, writes an informal Persian description such as «دو لاته، یکی کم‌شیر و یک چیزکیک», and requests a **proposal**. The application shows the recognized menu items, quantities, source phrases and preparation notes. Each proposal can be changed, split into separately prepared portions, deleted or replaced with an available menu item. **Unmatched and ambiguous phrases remain visible until staff explicitly resolve or dismiss them.**
 
-The model is restricted to the authenticated restaurant's menu. The server validates its output again, selects prices itself, and **never lets the model submit an order, charge a customer or alter a bill**. Ambiguous or unmatched text is exposed rather than silently invented. Provider failure or timeout does not block manual entry.
+The **افزودن اقلام تأییدشده به پیش‌نویس** action only changes the local draft. The separate **ثبت نوبت و ارسال به آشپزخانه** action sends a real, transactionally validated order. A model **cannot** set a price, change table, authorize payment, submit kitchen instructions or override permissions. Final submission checks current restaurant menu, session identity and optional `expectedPriceToman`; changed prices return HTTP 409 instead of being silently charged.
 
-Set these environment variables to activate the optional feature:
+**Without a configured provider:** the UI displays **تطبیق ساده با منو**, an intentionally limited **rule-based matching** mode for explicit menu names. It is *not* AI, and unclear expressions need manual review. **With a configured and authorized provider:** staff see a model-backed suggestion, and the server checks IDs, quantities, evidence and unmatched phrases. Manual entry is always available if the provider fails.
+
+The new, table-bound endpoint is `POST /api/ai/order-suggestions`. Requests contain `{tableId, expectedSessionId, clientRequestId, sourceRevision, note}`; responses include `items`, `unresolved`, `source`, `context` and `requiresConfirmation: true`. Older `/api/ai/parse` remains as a compatibility endpoint, but the interface uses the new scoped endpoint.
+
+For an *eligible and legally authorized* external provider, server-only environment configuration is:
 
 ```dotenv
-AI_API_URL=https://your-trusted-provider.example/v1/chat/completions
+AI_API_URL=https://trusted-provider.example/v1/chat/completions
 AI_API_KEY=your-private-key
 AI_MODEL=your-model
-# optional: AI_TIMEOUT_MS=4500
+# optional AI_TIMEOUT_MS=4500
+# optional AI_ALLOWED_HOSTS=trusted-provider.example
+# optional AI_DAILY_REQUEST_LIMIT=200
+# AI_ORDER_ENABLED=false  # immediate operator kill switch; manual ordering stays available
 ```
 
-The provider must be a trusted HTTPS, OpenAI-compatible chat-completions endpoint. **Without these values, the AI feature is visibly unavailable**, not replaced by a fake local model. Do not place real customer identities or payment details in prompts. See [AI_USAGE.md](AI_USAGE.md) and [AI_PROMPTS.md](AI_PROMPTS.md) for the implementation disclosure.
+Never place provider keys in the browser or submit customer identity, contact numbers, allergies assumed safe, or payment card details in a free-text order. Rate limits are per instance; horizontally scaled hosting requires a shared quota store and an independently enforced provider billing limit. **Availability and commercial eligibility for Iranian customers must be verified with the chosen provider before live activation.** No real-model accuracy or approval for this market is implied by the deterministic demo.
+
+Implementation and acceptance references: [product specification](docs/AI_ORDER_INTAKE_SPEC.fa.md), [technical design](docs/AI_ORDER_TECHNICAL_DESIGN.md), [RTL UX wireframe](docs/AI_ORDER_UX_WIREFRAME.fa.md), [test plan](docs/AI_ORDER_TEST_PLAN.fa.md), [Iran provider feasibility](docs/AI_PROVIDER_FEASIBILITY.fa.md), and [36 Persian reference cases](tests/fixtures/ai-order-golden.fa.json). The follow-on feature work is distinguished from the original six-hour assessment in [AI_USAGE.md](AI_USAGE.md).
 
 ## Architecture and engineering decisions
 

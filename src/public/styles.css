@@ -287,3 +287,56 @@ button:disabled{cursor:not-allowed}
 .cash-table[aria-pressed="true"]{box-shadow:inset 0 0 0 1px var(--ink)}
 @media(max-width:850px){.cash-bill{scroll-margin-top:16px}}
 @media(max-width:1000px){.hall-steps{scroll-margin-top:8px}}
+
+
+/* Natural-language order intake: coherent Persian RTL review, not a second checkout. */
+.ai-box{margin-block:20px;padding:clamp(14px,2vw,20px);border:1px solid #d3e4d6;border-radius:17px;background:linear-gradient(145deg,#f5f8f0,#fffdf7);min-width:0}
+.ai-header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px}
+.ai-header h3{font-size:15px;margin:0 0 5px;color:var(--ink);font-weight:760}
+.ai-header p{font-size:12px;color:var(--ink2);margin:0;line-height:1.85}
+.ai-mode{background:#e5ede4;color:var(--ink2);font-weight:700;font-size:11px;padding:5px 9px;border-radius:999px}
+.ai-target{font-size:12px;font-weight:720;color:#265d47;background:#e5efe5;border-radius:9px;padding:8px 11px;margin:12px 0}
+.ai-box .label{font-size:12px}
+.ai-textarea{min-height:100px;resize:vertical;width:100%;line-height:1.95;font-size:14px}
+.ai-helper{font-size:11px;line-height:1.85;color:var(--muted);margin:6px 0 9px}
+.ai-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}
+.ai-actions .btn{min-height:44px}
+.ai-status{font-size:12px;min-height:0;line-height:1.8;color:#35614c}
+.ai-status:empty{display:none}
+.ai-error{font-size:12px;line-height:1.8;color:#963d32;background:#faeeea;border:1px solid #eecbc2;padding:9px 11px;border-radius:10px;margin:9px 0}
+.ai-preview{margin-top:15px;padding:12px;border:1px solid #d9e5d8;border-radius:14px;background:#fff}
+.ai-preview-title,.ai-line-head,.ai-line-bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.ai-preview-title{margin-bottom:10px}
+.ai-preview-title h4,.ai-unresolved h4{margin:0;font-size:14px;font-weight:760}
+.ai-preview-title span{color:var(--muted);font-size:12px}
+.ai-review-line{padding:14px 11px;margin-bottom:10px;background:#f9fbf7;border:1px solid #e2e9df;border-radius:12px;min-width:0}
+.ai-line-head b{font-size:13px;color:var(--ink)}
+.ai-evidence{margin:6px 0 10px;font-size:12px;line-height:1.65;color:var(--muted);overflow-wrap:anywhere}
+.ai-review-line .field,.ai-unresolved .field{width:100%;max-width:100%;min-width:0}
+.ai-review-line select{margin-block:4px 10px}
+.ai-edit-grid{display:grid;grid-template-columns:minmax(76px,100px) minmax(0,1fr);gap:9px;align-items:end}
+.ai-edit-grid label{display:block;min-width:0}
+.ai-edit-grid input{margin-top:5px}
+.ai-line-bottom{margin-top:9px}
+.ai-line-bottom .ghost-btn{white-space:normal;text-align:center;min-height:38px}
+.ai-unresolved{margin-top:13px;background:#fff8ed;border:1px solid #ecdab4;padding:12px;border-radius:13px}
+.ai-unresolved h4{color:#795018}
+.ai-unresolved>p{font-size:12px;color:#795018;line-height:1.9;margin:4px 0 12px}
+.ai-unresolved-item{border-top:1px solid #f0dfc4;padding:10px 0}
+.ai-unresolved-item p{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px;line-height:1.85;margin:0 0 8px;overflow-wrap:anywhere}
+.ai-unresolved-item strong{color:#513c22}
+.ai-reason{color:#7a5935}
+.ai-unresolved-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ai-unresolved-controls select{flex:1 1 180px}
+.ai-unresolved-controls button{min-height:42px}
+.ai-review-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:13px}
+.ai-review-actions .btn{min-height:44px;flex:1 1 150px;white-space:normal}
+.ai-box button,.ai-review-line button{touch-action:manipulation}
+.ai-box .ghost-btn{font-size:12px}
+@media(max-width:420px){
+ .ai-box{margin-inline:-2px;padding:12px}
+ .ai-review-line{padding:11px 9px}
+ .ai-preview{padding:9px}
+ .ai-edit-grid{grid-template-columns:minmax(65px,88px) minmax(0,1fr)}
+ .ai-actions .btn{flex:1 1 180px}
+}

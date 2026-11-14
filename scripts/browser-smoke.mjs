@@ -31,6 +31,9 @@ const login = async (email) => {
   await page.locator('.main-nav').waitFor({ state: 'visible' });
 };
 const logout = async () => {
+  // A 200 HTTP response may precede the app's refresh/finally sequence.
+  // Wait for the operation guard to release before pressing Logout.
+  await page.locator('#app.app-busy').waitFor({ state: 'hidden' });
   await page.locator('[data-action="logout"]').click();
   await page.locator('#login-form').waitFor({ state: 'visible' });
 };
@@ -110,6 +113,48 @@ try {
    await page.locator('.cat-chip').first().click();
    assert.equal(await search.getAttribute('data-identity'),'stable','Resetting category should not remount search');
    await snap('02-waiter-hall');
+  await chooseTable(8);
+  // Rule-based demo must be described honestly and remain usable without a paid provider.
+  await page.locator('#ai-note').fill('دو تا لاته، یکی کم‌شیر و نوشابه');
+  await page.locator('[data-action="ai-parse"]').click();
+  await page.locator('.ai-review-line').first().waitFor();
+  assert.match(await page.locator('.ai-mode').innerText(),/تطبیق ساده|مدل زبانی/);
+  assert.equal(await page.locator('.ai-review-line').count(),2,'Different drink preparation notes need different rows');
+  assert.equal(await page.locator('.ai-unresolved-item').count(),1,'Missing menu items must be shown explicitly');
+  assert.equal(await page.locator('[data-action="ai-apply"]').isDisabled(),true,'Unresolved items need explicit resolution');
+  const noteValues=await page.locator('[data-ai-note]').evaluateAll(els=>els.map(x=>x.value));
+  assert.equal(noteValues.filter(Boolean).length,1,'One note must not be applied to both drinks');
+  await page.locator('[data-ai-menu="0"]').selectOption({label:'اسپرسو'});
+  assert.equal(await page.locator('[data-ai-menu="0"]').inputValue(),await page.locator('button.add[aria-label="افزودن اسپرسو"]').getAttribute('data-id'));
+  await page.locator('[data-ai-qty="0"]').fill('۲');
+  await page.locator('[data-ai-qty="0"]').press('Tab');
+  assert.match(await page.locator('[data-ai-price="0"]').innerText(),/تومان/,'Price preview updates with quantity');
+  await page.locator('[data-ai-resolve="0"]').selectOption({label:'آب معدنی'});
+  assert.equal(await page.locator('.ai-unresolved-item').count(),0,'Explicit menu selection resolves unknown source phrase');
+  assert.equal(await page.locator('.ai-review-line').count(),3);
+  await page.locator('[data-action="ai-apply"]').click();
+  assert.equal(await page.locator('.draft-line').count(),3,'Confirmed edits become distinct draft lines');
+  assert.equal(await page.locator('.current-item').count(),0,'Proposal acceptance must not write any order');
+  for(let i=0;i<3;i++)await page.locator('.draft-line [data-action="remove-draft"]').first().click();
+  // A text edit invalidates the old proposal and requires a fresh analysis.
+  await page.locator('#ai-note').fill('یک چیزکیک');
+  await page.locator('[data-action="ai-parse"]').click();
+  await page.locator('.ai-review-line').first().waitFor();
+  await page.locator('#ai-note').fill('دو چیزکیک');
+  assert.equal(await page.locator('.ai-review-line').count(),0,'Changing source text invalidates a stale suggestion');
+  await page.locator('[data-action="ai-clear"]').click();
+  // An old delayed response cannot be used after changing the selected table.
+  await page.route('**/api/ai/order-suggestions',async route=>{
+    await new Promise(resolve=>setTimeout(resolve,350));
+    await route.continue().catch(()=>{});
+  });
+  await page.locator('#ai-note').fill('دو تا لاته');
+  await page.locator('[data-action="ai-parse"]').click();
+  await chooseTable(3);
+  await page.waitForTimeout(600);
+  assert.equal(await page.locator('.ai-review-line').count(),0,'Old table suggestions must not be actionable');
+  assert.equal(await page.locator('#ai-note').inputValue(),'','Switching tables clears the former table note');
+  await page.unroute('**/api/ai/order-suggestions');
   await chooseTable(8);
   await sendRound('چای زعفرانی');
   await sendRound('لیموناد'); // Two rounds in the SAME table session.
@@ -245,6 +290,21 @@ try {
     await mobilePage.locator('#menu-search').fill('');
     await mobilePage.locator('.hall-step[data-id="order"]').click();
     assert.equal(await mobilePage.locator('[data-draft-note="1"]').inputValue(),'یکی بدون یخ');
+    await mobilePage.locator('#ai-note').fill('دو تا لاته، یکی کم‌شیر و نوشابه');
+    await mobilePage.locator('[data-action="ai-parse"]').click();
+    await mobilePage.locator('.ai-review-line').first().waitFor();
+    assert.equal(await mobilePage.locator('.ai-review-line').count(),2,'Mobile review must split distinct preparation notes');
+    assert.equal(await mobilePage.locator('.ai-unresolved-item').count(),1,'Unknown order text must remain visible');
+    for(const width of [320,390]){
+      await mobilePage.setViewportSize({width,height:844});
+      const size=await mobilePage.evaluate(()=>({viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth}));
+      assert.ok(size.scrollWidth<=size.viewport+2,'AI review overflows narrow screen: '+JSON.stringify(size));
+    }
+    await mobilePage.setViewportSize({width:390,height:844});
+    await mobilePage.screenshot({path:path.join(output,'13a-mobile-ai-review.png'),fullPage:true});
+    await mobilePage.locator('[data-action="ai-dismiss"]').click();
+    await mobilePage.locator('[data-action="ai-apply"]').click();
+    assert.equal(await mobilePage.locator('.draft-line').count(),4,'Mobile AI adds to the existing manual draft');
     await mobilePage.screenshot({path:path.join(output,'13-mobile-order-review.png'),fullPage:true});
     // A navigation across tables must not silently discard a typed draft.
     await mobilePage.locator('.hall-step[data-id="tables"]').click();

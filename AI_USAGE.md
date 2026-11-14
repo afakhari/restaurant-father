@@ -82,3 +82,11 @@ A later real-shift review revealed two previously under-addressed issues: (1) AP
 A subsequent review found that reusing an idempotency key on the *same table* with **different item quantities or notes** could return a replay success for the old order, silently discarding an edited retry after a network failure. The server now compares canonical item/quantity/note contents and returns HTTP 409 on a mismatch. The client retains the draft and tells staff to inspect the table before submitting a new round. This was checked with a new PostgreSQL negative test.
 
 The same review tightened role-specific JSON responses, added manager-only fully cancelled table release (with no fake payment), and introduced tests for localized Persian/Arabic discount digits. These decisions were informed by AI-assisted analysis and then checked with local unit tests and GitHub Actions, not through direct observation of a real restaurant shift.
+
+
+## Later feature: editable order suggestions (2026-11-14)
+
+At the user's request after the original assessment, GPT-6 assisted with the product/UX threat review and implementation of a table/session-bound `/api/ai/order-suggestions` endpoint, a Persian editable proposal UI, explicit handling of unresolved phrases, a **clearly labeled non-AI rule-based fallback**, optional model integration, and price-snapshot conflict handling. Human approval remains separate from final order creation. Unit tests, PostgreSQL integration and Chromium browser tests were added and must be checked against their specific CI runs before making release claims.
+
+A provider-backed model was not activated as part of this work, and no authentic model accuracy or latency results are claimed. Iran-market eligibility and user-data handling must be reviewed with a real provider before enabling paid inference. The original six-hour task has not been retroactively expanded; this is follow-on work requested later.
+

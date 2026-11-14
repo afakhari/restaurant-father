@@ -16,7 +16,8 @@ export function parseRound(body) {
     const menuItemId=requireUuid(x.menuItemId,'غذا');
     const quantity=requireInt(x.quantity,1,20,'تعداد');
     if(typeof x.note!=='string'||x.note.length>240)throw new HttpError(400,'VALIDATION','یادداشت طولانی یا نامعتبر است.');
-    return {menuItemId,quantity,note:x.note.trim()};
+    const expectedPriceToman=x.expectedPriceToman===undefined?undefined:requireInt(x.expectedPriceToman,0,1000000000,'قیمت مورد انتظار');
+    return {...(expectedPriceToman===undefined?{}:{expectedPriceToman}),menuItemId,quantity,note:x.note.trim()};
   });
   return {tableId,expectedSessionId,idempotencyKey,items};
 }
@@ -30,14 +31,18 @@ export function nextItemStatus(current,to,role,reason=''){
 export function sumSubtotal(items){return items.filter(x=>x.status!=='cancelled').reduce((sum,x)=>sum + Number(x.quantity)*Number(x.unit_price_toman),0);}
 export function canCheckout(items){return items.length>0&&items.every(x=>['served','cancelled'].includes(x.status))&&items.some(x=>x.status==='served');}
 export function canVoidSession(items){return items.length>0&&items.every(x=>x.status==='cancelled');}
+// Compatibility endpoint only. Never discard invalid model output without reporting it.
 export function normalizeAIResult(payload,menu){
-  if(!payload||!Array.isArray(payload.items))throw new HttpError(502,'AI_INVALID','پاسخ دستیار قابل استفاده نیست.');
-  const allowed=new Set(menu.filter(x=>x.available).map(x=>x.id));
-  const out=payload.items.slice(0,12).map(x=>{
-    if(!allowed.has(x.menuItemId))return null;
-    if(!Number.isInteger(x.quantity)||x.quantity<1||x.quantity>20)return null;
-    return {menuItemId:x.menuItemId,quantity:x.quantity,note:typeof x.note==='string'?x.note.slice(0,240):''};
-  }).filter(Boolean);
-  if(!out.length)throw new HttpError(422,'AI_NO_MATCH','غذای مشخصی از منوی فعلی پیدا نشد.');
-  return {items:out,unmatched:typeof payload.unmatched==='string'?payload.unmatched.slice(0,240):''};
+ if(!payload||!Array.isArray(payload.items))throw new HttpError(502,'AI_INVALID','پاسخ دستیار قابل استفاده نیست.');
+ const allowed=new Set(menu.filter(x=>x.available).map(x=>x.id));
+ const items=[],rejected=[];
+ for(const [i,x] of payload.items.entries()){
+  if(i>=12){rejected.push({index:i,reason:'too_many_lines'});continue;}
+  if(!x||!allowed.has(x.menuItemId)){rejected.push({index:i,reason:'unknown_menu_item'});continue;}
+  if(!Number.isInteger(x.quantity)||x.quantity<1||x.quantity>20){rejected.push({index:i,reason:'invalid_quantity'});continue;}
+  if(typeof x.note!=='string'||x.note.length>240){rejected.push({index:i,reason:'invalid_note'});continue;}
+  items.push({menuItemId:x.menuItemId,quantity:x.quantity,note:x.note.trim()});
+ }
+ if(!items.length)throw new HttpError(422,'AI_NO_MATCH','غذای مشخصی از منوی فعلی پیدا نشد.');
+ return {items,unmatched:typeof payload.unmatched==='string'?payload.unmatched.slice(0,240):'',rejected};
 }

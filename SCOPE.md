@@ -52,3 +52,9 @@ This is a **narrow operational service MVP**, not a full ERP. Use polling over a
 
 ## Scope-control rule
 Finish and test the single round-trip workflow before adding optional AI refinements or new screens. Any extra feature must justify removing something from the six-hour cap.
+
+
+## Chronological follow-on scope decision (2026-11-14)
+
+The original scope above is preserved as a historical record. A later user request expanded optional note parsing into an editable text-to-proposal workflow: table-bound requests, strict menu-only suggestion validation, distinct preparation notes for differently prepared units, explicit handling of ambiguous/missing items, draft review, and separately confirmed order posting. A deterministic fallback is labeled non-AI where no provider is configured; legal/business access and cost controls must precede real AI inference for the Iranian market. This extension is later work and must not be represented as part of the initial six-hour assessment. Supporting files: docs/AI_ORDER_INTAKE_SPEC.fa.md, docs/AI_ORDER_TECHNICAL_DESIGN.md, tests/ai-order.test.mjs.
+

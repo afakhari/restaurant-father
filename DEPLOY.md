@@ -26,6 +26,14 @@ Run `docker compose up --build`. The migration container uses `ADMIN_DATABASE_UR
 
 For a trusted OpenAI-compatible API set `AI_API_URL` (HTTPS full chat-completions URL), `AI_API_KEY`, `AI_MODEL`, optional `AI_TIMEOUT_MS`. Do not expose the key in frontend code. Limit billing/rate externally and test Persian menu ambiguity. AI remains disabled if settings are absent.
 
+### Order-intake deployment and consumption limits
+
+The human-reviewed `/api/ai/order-suggestions` endpoint is available in deterministic, clearly labeled rule-based mode without any provider key or inference charges. Actual model inference requires `AI_API_URL`, `AI_API_KEY`, `AI_MODEL` and independent confirmation that the provider permits service to the intended Iranian market. Do not interpret Render hosting outside Iran as a substitute for provider eligibility.
+
+Optional security/operations settings: `AI_ORDER_ENABLED=false` immediately disables all suggestion endpoints while leaving manual ordering working; `AI_ALLOWED_HOSTS` constrains outbound provider hostnames; `AI_DAILY_REQUEST_LIMIT` defaults to 200 requests per tenant per UTC day. Per employee, a five-minute window permits 20 requests and at most two concurrent model requests. These limits are local to one Node process. For multi-instance production, use a shared quota/limiter and a provider-side billing cap.
+
+Order text containing recognizable phone/card numbers is rejected before provider transmission, but this is not comprehensive data-loss prevention. Keep customer identities, numbers and payment information out of prompts. The server does not log the raw order text. Verify the actual model response quality, privacy retention, and provider costs with synthetic Persian orders before enabling inference. Rule-based test success must never be reported as real-provider AI validation.
+
 ## Important caveats
 
 - `compose.yaml` includes **local demo credentials** and must not be deployed unchanged on the public internet.

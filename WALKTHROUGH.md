@@ -14,7 +14,7 @@
 | 6:05–6:45 | Optional AI parse with real provider (only if configured) | Human preview, bounded menu IDs, manual fallback; otherwise acknowledge provider not configured |
 | 6:45–7:45 | `DECISIONS.md`, `HANDOVER.md`, `AI_USAGE.md` | What went wrong, which two decisions we'd change, where 1k/100k scale fails, full AI assistance disclosure |
 
-Do not claim deployed HTTPS, real AI output, passing integration tests or running video unless independently confirmed. The operator should capture screen and voice from a real running instance, and put a verifiable URL in the final submission.
+A public Render HTTPS demo URL is documented, but do not claim completed hosted-login acceptance, real provider output, or a candidate-narrated video until each has been independently verified. Link the relevant CI results rather than assuming a green status. The operator should capture screen and voice from a real running instance, and put a verifiable URL in the final submission.
 
 ## Browser evidence as a visual aid, not candidate narration
 
@@ -26,3 +26,9 @@ If the `Browser UX walkthrough and evidence` CI workflow passes, download its `r
 On a **phone**, demonstrate the three ordering steps (table → menu → order), the sticky draft summary, note editing, and the confirmation warning when changing tables with an unsubmitted draft. Show a cashier checkout confirmation in the application's own dialog. State clearly that the "connection status" label reflects the last server snapshot and is not a durable offline order queue. The latest UX acceptance matrix and limits are in [docs/UX_AUDIT.fa.md](docs/UX_AUDIT.fa.md).
 
 در نمای مدیر، نشان دهید که **بستن میز کاملاً لغوشده** پرداخت صفرِ ساختگی تولید نمی‌کند؛ علت ثبت می‌شود و صندوق‌دار این مجوز را ندارد. در صندوق، تخفیف «۵۰٬۰۰۰» با رقم فارسی و در سالن، «تفکیک قلم» برای دو نوشیدنی متفاوت را می‌توان به‌عنوان دو مثال مشخص از بومی‌سازی نشان داد.
+
+
+## Follow-on editable order-intake walkthrough
+
+Select a table, enter «دو تا لاته، یکی کم‌شیر و نوشابه», and show the two separately prepared drinks and the explicit unmatched phrase. Dismiss or resolve it, edit the proposal, add only approved items to the **draft**, and point out that the kitchen has no new ticket until final submission. Changing tables with unsaved notes should display a discard warning. When no AI provider is configured, call this limited feature **rule-based menu matching**, never a real AI demonstration. Check Persian/Arabic numerals and responsive mobile steps. This feature and any later recording are outside the original six-hour slice and do not substitute for the candidate's required narrated video.
+
