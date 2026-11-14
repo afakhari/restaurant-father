@@ -32,6 +32,7 @@ export async function addRound(user,raw){
    const menu=await client.query('SELECT id,name,price_toman,available FROM menu_items WHERE id=ANY($1::uuid[])',[ids]);
    const byId=new Map(menu.rows.map(x=>[x.id,x]));
    if(ids.some(id=>!byId.get(id)?.available))throw new HttpError(409,'MENU_CHANGED','یک یا چند غذا ناموجود یا خارج از منوی رستوران است.');
+   if(body.items.some(x=>x.expectedPriceToman!==undefined && Number(byId.get(x.menuItemId).price_toman)!==x.expectedPriceToman))throw new HttpError(409,'MENU_PRICE_CHANGED','قیمت یک یا چند قلم تغییر کرده است. پیش از ارسال، قیمت‌های جدید را تأیید کنید.');
    let sId=sessionId;
    if(!sId){const s=await client.query('INSERT INTO table_sessions(restaurant_id,branch_id,table_id,opened_by) VALUES($1,$2,$3,$4) RETURNING id',[user.restaurantId,table.branch_id,table.id,user.id]);sId=s.rows[0].id;}
    const roundId=randomUUID();
