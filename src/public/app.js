@@ -129,7 +129,7 @@ async function analyzeOrder(){
  state.aiRequest=request;state.aiLoading=true;state.aiPreview=null;state.aiWarning='';render();
  try{
   const response=await api('/api/ai/order-suggestions',{method:'POST',signal:controller.signal,body:JSON.stringify({note:text,tableId,expectedSessionId:sessionId,clientRequestId:requestId,sourceRevision:revision})});
-  if(state.aiRequest!==request||state.aiRevision!==revision||state.tableId!==tableId||state.branchId!==branchId||state.me?.id!==actorId||state.aiText.trim()!==text||sessionFor(tableId)?.id!==sessionId||response.clientRequestId!==requestId)return;
+  if(state.aiRequest!==request||state.aiRevision!==revision||state.tableId!==tableId||state.branchId!==branchId||state.me?.id!==actorId||state.aiText.trim()!==text||(sessionFor(tableId)?.id??null)!==sessionId||response.clientRequestId!==requestId)return;
   state.aiPreview=response;
   if(response.unresolved?.length)state.aiWarning='بخشی از سفارش روشن نیست؛ پیش از افزودن، موارد مشخص‌شده را بررسی کنید.';
  }catch(err){
