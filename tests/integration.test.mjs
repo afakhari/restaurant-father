@@ -61,6 +61,12 @@ test('parallel round additions survive, retries are idempotent, tenant cannot al
  assert.equal(editedQuantity.body.error.code,'IDEMPOTENCY_CONFLICT');
  const editedNote=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],note:'بدون یخ'}]});
  assert.equal(editedNote.status,409,'same retry key with changed note cannot lose a preparation instruction');
+ const replayPrice=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],expectedPriceToman:Number(drinks.price_toman)}]});
+ assert.equal(replayPrice.status,201,'correct expected historical price should be replayable');
+ assert.equal(replayPrice.body.replayed,true);
+ const wrongPriceReplay=await request('waiter','POST','/api/rounds',{...payloadA,items:[{...payloadA.items[0],expectedPriceToman:Number(drinks.price_toman)+1000}]});
+ assert.equal(wrongPriceReplay.status,409,'a changed expected price must not succeed as a replay');
+ assert.equal(wrongPriceReplay.body.error.code,'IDEMPOTENCY_CONFLICT');
  // Reusing the same idempotency key on a different table must NOT silently return the old round.
  const otherTable=A.tables.find(x=>x.id!==t.id);
  const wrongTable=await request('waiter','POST','/api/rounds',{...payloadA,tableId:otherTable.id,expectedSessionId:null});
