@@ -53,8 +53,8 @@ test('model invalid items are visible as unresolved rather than silently disappe
  assert.equal(final.requiresConfirmation,true);
 });
 test('overflow of 12 model lines is explicit and cannot hide the 13th',()=>{
- const items=Array.from({length:13},(_,i)=>({menuItemId:ids[0],quantity:1,note:'',sourceText:'لاته '+i}));
- const result=validateModelSuggestion({items},menu,'تعداد زیاد لاته');
+ const items=Array.from({length:13},()=>({menuItemId:ids[0],quantity:1,note:'',sourceText:'لاته'}));
+ const result=validateModelSuggestion({items},menu,'لاته');
  assert.equal(result.items.length,12);
  assert.equal(result.unresolved.length,1);
  assert.equal(result.unresolved[0].reason,'too_many_lines');
@@ -82,4 +82,20 @@ test('ambiguous multiple menu names and repeated mentions fail closed',()=>{
  const repeated=parseOrderRules('لاته لاته',menu);
  assert.equal(repeated.items.length,0);
  assert.equal(repeated.unresolved[0].reason,'repeated_mention');
+});
+
+test('model cannot silently omit a second dish when the first was matched',()=>{
+ const extracted=validateModelSuggestion({items:[{menuItemId:ids[0],quantity:2,note:'',sourceText:'دو لاته'}],unmatched:''},menu,'دو لاته و یک چیزکیک');
+ assert.equal(extracted.items.length,1);
+ assert.ok(extracted.unresolved.some(x=>x.reason==='unaccounted_for'&&x.text.includes('چیزکیک')));
+});
+test('model must provide source evidence present in the actual utterance',()=>{
+ const extracted=validateModelSuggestion({items:[{menuItemId:ids[0],quantity:1,note:'',sourceText:'یک لاته ناموجود در متن'}],unmatched:''},menu,'یک چیزکیک');
+ assert.equal(extracted.items.length,0);
+ assert.ok(extracted.unresolved.some(x=>x.reason==='unverified_evidence'));
+});
+test('model cannot apply a single-unit modifier to every unit',()=>{
+ const extracted=validateModelSuggestion({items:[{menuItemId:ids[0],quantity:2,note:'کم‌شیر',sourceText:'دو لاته یکی کم‌شیر'}],unmatched:''},menu,'دو لاته یکی کم‌شیر');
+ assert.equal(extracted.items.length,0);
+ assert.ok(extracted.unresolved.some(x=>x.reason==='ambiguous_unit_note'));
 });
