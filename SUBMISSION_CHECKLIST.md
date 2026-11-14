@@ -35,7 +35,8 @@ The local seeded accounts are listed in README. **Do not expose the local Docker
 - [x] PostgreSQL integration tests: tenant isolation, role checks, concurrent rounds, replay and full waiter-to-cashier flow; GitHub Actions passing on the latest verified main commit (recheck before submission).
 - [ ] Public **HTTPS** website opens and authenticates seeded accounts.
 - [x] Production/demo password differs from local Docker password; no secrets in repository.
-- [ ] AI provider configured, tested on Persian note, with clear failure fallback. If provider isn't available, disclose it, as an implemented but inactive capability.
+- [x] Editable Persian order proposals, clear unresolved cases and human-approved draft workflow implemented; rule-based fallback labeled non-AI. See [implementation PR](https://github.com/afakhari/restaurant-father/pull/15) and Persian test corpus.
+- [ ] Optional real-model provider enabled only after confirming Iranian service eligibility, budget and privacy terms; absent that, disclose **rule-based matching, not live AI**.
 - [ ] Browser/mobile walkthrough on hosted environment with realistic multi-staff concurrency.
 - [ ] Actual 5–10 minute recorded walkthrough showing the running application and **more than half explaining why**; video uploaded or linked in the submission form.
 - [ ] Correct and accessible README/documents upload format in the submission form.
