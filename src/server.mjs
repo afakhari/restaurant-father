@@ -88,7 +88,7 @@ async function modelOrderSuggestions(text,menu){
    data=JSON.parse(rawText);
    const raw=data?.choices?.[0]?.message?.content;
    if(typeof raw!=='string'||raw.length>20000)throw Error('invalid content');
-   parsed=JSON.parse(raw.replace(/^`json\s*/,'').replace(/\s*`$/,''));
+   parsed=JSON.parse(raw);
   }catch{throw new HttpError(502,'AI_INVALID','پاسخ دستیار قابل پردازش نیست؛ متن سفارش محفوظ مانده است.');}
   return validateModelSuggestion(parsed,menu,text);
  }catch(error){
