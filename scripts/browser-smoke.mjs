@@ -114,8 +114,6 @@ try {
   // Rule-based demo must be described honestly and remain usable without a paid provider.
   await page.locator('#ai-note').fill('دو تا لاته، یکی کم‌شیر و نوشابه');
   await page.locator('[data-action="ai-parse"]').click();
-  await page.waitForTimeout(550);
-  console.log('AI_PREVIEW_DIAGNOSTIC',JSON.stringify({panel:(await page.locator('.ai-box').innerText()).slice(0,1600),lines:await page.locator('.ai-review-line').count(),errors:consoleErrors}));
   await page.locator('.ai-review-line').first().waitFor();
   assert.match(await page.locator('.ai-mode').innerText(),/تطبیق ساده|مدل زبانی/);
   assert.equal(await page.locator('.ai-review-line').count(),2,'Different drink preparation notes need different rows');
@@ -123,12 +121,18 @@ try {
   assert.equal(await page.locator('[data-action="ai-apply"]').isDisabled(),true,'Unresolved items need explicit resolution');
   const noteValues=await page.locator('[data-ai-note]').evaluateAll(els=>els.map(x=>x.value));
   assert.equal(noteValues.filter(Boolean).length,1,'One note must not be applied to both drinks');
-  await page.locator('[data-action="ai-dismiss"]').click();
+  await page.locator('[data-ai-menu="0"]').selectOption({label:'اسپرسو'});
+  assert.equal(await page.locator('[data-ai-menu="0"]').inputValue(),(await page.locator('.menu-item').filter({hasText:'اسپرسو'}).locator('button.add')).getAttribute('data-id'));
+  await page.locator('[data-ai-qty="0"]').fill('۲');
+  await page.locator('[data-ai-qty="0"]').press('Tab');
+  assert.match(await page.locator('[data-ai-price="0"]').innerText(),/تومان/,'Price preview updates with quantity');
+  await page.locator('[data-ai-resolve="0"]').selectOption({label:'آب معدنی'});
+  assert.equal(await page.locator('.ai-unresolved-item').count(),0,'Explicit menu selection resolves unknown source phrase');
+  assert.equal(await page.locator('.ai-review-line').count(),3);
   await page.locator('[data-action="ai-apply"]').click();
-  assert.equal(await page.locator('.draft-line').count(),2,'Confirmed suggestions must become separate draft lines');
+  assert.equal(await page.locator('.draft-line').count(),3,'Confirmed edits become distinct draft lines');
   assert.equal(await page.locator('.current-item').count(),0,'Proposal acceptance must not write any order');
-  await page.locator('.draft-line [data-action="remove-draft"]').first().click();
-  await page.locator('.draft-line [data-action="remove-draft"]').first().click();
+  for(let i=0;i<3;i++)await page.locator('.draft-line [data-action="remove-draft"]').first().click();
   // A text edit invalidates the old proposal and requires a fresh analysis.
   await page.locator('#ai-note').fill('یک چیزکیک');
   await page.locator('[data-action="ai-parse"]').click();
