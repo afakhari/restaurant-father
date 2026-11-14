@@ -1,12 +1,12 @@
 # Deployment and HTTPS checklist
 
-**Status:** GitHub repository and Docker Compose recipe prepared. **No live HTTPS deployment has been completed or verified by the authoring environment.** A public URL cannot be invented; neither can credentials for an unprovisioned host.
+**Status (2026-11-14):** A Render Free demo URL is recorded in the repository: **https://restaurant-father-demo-xem8.onrender.com**. Render/Neon provisioning and a healthy service were reported during deployment, but an independent external HTTPS login and complete hosted browser acceptance walkthrough are **not yet verified**. This file remains the reproducible deployment and security checklist. Visitors accessing Render from Iran may need to enable a VPN.
 
 ## Free-tier reviewer demo (recommended)
 
 Use the root [render.yaml](render.yaml) for a **free Render web service** and a **separate Neon free-tier PostgreSQL database**. See [docs/FREE_DEMO_DEPLOY.fa.md](docs/FREE_DEMO_DEPLOY.fa.md) for the complete, ordered procedure, GitHub Actions bootstrap and HTTPS verification.
 
-The web service receives only `DATABASE_URL` for the unprivileged `restaurant_runtime` role; `ADMIN_DATABASE_URL`, `DB_APP_PASSWORD` and `DEMO_PASSWORD` must not be stored in Render runtime environment variables. `PUBLIC_ORIGIN` is wired to the Render-generated HTTPS URL, and secure cookies are enabled. No live URL, Neon database or Render service has been created or claimed by this repository.
+The web service receives only `DATABASE_URL` for the unprivileged `restaurant_runtime` role; `ADMIN_DATABASE_URL`, `DB_APP_PASSWORD` and `DEMO_PASSWORD` must not be stored in Render runtime environment variables. `PUBLIC_ORIGIN` is wired to the Render-generated HTTPS URL, and secure cookies are enabled. The current demo URL is https://restaurant-father-demo-xem8.onrender.com. Confirm authentication, authorization and the full operational workflow from an external browser before submission; a deployed service alone is not acceptance evidence.
 
 ## Local reproducible environment
 
@@ -26,13 +26,13 @@ Run `docker compose up --build`. The migration container uses `ADMIN_DATABASE_UR
 
 For a trusted OpenAI-compatible API set `AI_API_URL` (HTTPS full chat-completions URL), `AI_API_KEY`, `AI_MODEL`, optional `AI_TIMEOUT_MS`. Do not expose the key in frontend code. Limit billing/rate externally and test Persian menu ambiguity. AI remains disabled if settings are absent.
 
+### Order-intake deployment and consumption limits
 
-### Natural-language order intake release gate
+The human-reviewed `/api/ai/order-suggestions` endpoint is available in deterministic, clearly labeled rule-based mode without any provider key or inference charges. Actual model inference requires `AI_API_URL`, `AI_API_KEY`, `AI_MODEL` and independent confirmation that the provider permits service to the intended Iranian market. Do not interpret Render hosting outside Iran as a substitute for provider eligibility.
 
-Without AI credentials the user-facing feature remains functional as explicitly labeled, limited **rule-based menu matching**; no provider charges are incurred. The new `POST /api/ai/order-suggestions` checks employee role, tenant, table and active session; validates output and never writes an order. Final `POST /api/rounds` rechecks availability and optional expected price in its DB transaction.
+Optional security/operations settings: `AI_ORDER_ENABLED=false` immediately disables all suggestion endpoints while leaving manual ordering working; `AI_ALLOWED_HOSTS` constrains outbound provider hostnames; `AI_DAILY_REQUEST_LIMIT` defaults to 200 requests per tenant per UTC day. Per employee, a five-minute window permits 20 requests and at most two concurrent model requests. These limits are local to one Node process. For multi-instance production, use a shared quota/limiter and a provider-side billing cap.
 
-Before configuring a real provider, verify that its contractual and regional terms permit serving the intended Iranian market, establish an explicit billing cap, test its Persian extraction behavior against the golden cases and review its data-retention policy. Do not treat a Frankfurt server address as permission to supply a restricted service. The current in-memory limit is 20 suggestion calls per staff member per five minutes per instance: horizontally scaled hosting requires a shared limiter and cost quota. The endpoint rejects obvious phone/card details but this is not a complete DLP system; staff must avoid entering customer personal data. Never store keys in the repository or frontend, and never claim AI is live merely because the UI can produce deterministic suggestions.
-
+Order text containing recognizable phone/card numbers is rejected before provider transmission, but this is not comprehensive data-loss prevention. Keep customer identities, numbers and payment information out of prompts. The server does not log the raw order text. Verify the actual model response quality, privacy retention, and provider costs with synthetic Persian orders before enabling inference. Rule-based test success must never be reported as real-provider AI validation.
 
 ## Important caveats
 
