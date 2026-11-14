@@ -2,7 +2,7 @@
 
 **A narrow, operational MVP for Iranian café and restaurant shifts.** It connects waiter order entry, kitchen preparation, waiter handoff, and cashier settlement across multiple rounds on the same table. The emphasis is on *not losing work when several staff act at the same time*, rather than building every part of an ERP.
 
-> **Submission status:** a working code implementation with Docker Compose, migrations, demo seed, role-restricted HTTP API, RTL web UI, optional LLM capability, and tests. **There is no verified public deployment URL or candidate-recorded 5–10 minute video yet.** See [DEPLOY.md](DEPLOY.md). Do not confuse a GitHub repository with a running restaurant service.
+> **Submission status:** a working code implementation with Docker Compose, migrations, demo seed, role-restricted HTTP API, RTL web UI, optional LLM capability, and tests. **A free HTTPS demo is live on Render with a Neon PostgreSQL database; the candidate-recorded 5–10 minute video is still pending.** See [DEPLOY.md](DEPLOY.md). Do not confuse a GitHub repository with a running restaurant service.
 
 ## Quick start: one command
 
@@ -123,11 +123,11 @@ The current suite has **9 unit tests** (including Persian/Arabic input parsing) 
 
 ## Free public reviewer demo (Render + Neon)
 
-This repository includes a free-tier Render Blueprint in [render.yaml](render.yaml), a manual database bootstrap workflow, and an HTTPS acceptance script. **No public demo is deployed or verified yet.** Use [راهنمای انتشار رایگان](docs/FREE_DEMO_DEPLOY.fa.md) for the exact order, secret handling and reviewer checklist. The hosted runtime only receives the restricted `restaurant_runtime` database URL, never the Neon owner connection string. The public link must be tested before submitting it.
+This repository includes a free-tier Render Blueprint in [render.yaml](render.yaml), a manual database bootstrap workflow, and an HTTPS acceptance script. **Public demo: https://restaurant-father-demo-xem8.onrender.com.** Render reports a live deploy and healthy /api/health checks. The database has five independently seeded role accounts across two tenants, and tenant RLS has been checked against the restricted runtime user. An external end-to-end HTTPS login/browser check has not yet been completed. Use [راهنمای انتشار رایگان](docs/FREE_DEMO_DEPLOY.fa.md) for the exact order, secret handling and reviewer checklist. The hosted runtime only receives the restricted `restaurant_runtime` database URL, never the Neon owner connection string. The public link must be tested before submitting it.
 
 ## Production deployment
 
-Read [DEPLOY.md](DEPLOY.md) before putting this behind HTTPS. Do not deploy with demo passwords or a seeded public trial on the same database as real customers. A live HTTPS URL, real demo credentials, and a recorded walkthrough remain external submission requirements; they are **not fabricated by this repo**.
+Read [DEPLOY.md](DEPLOY.md) before putting this behind HTTPS. Do not deploy with demo passwords or a seeded public trial on the same database as real customers. The live HTTPS demo is https://restaurant-father-demo-xem8.onrender.com. The reviewer needs the separately shared demo password, and a candidate-recorded walkthrough remains an external submission requirement. Do not commit public demo passwords.
 
 ## Handover and review
 
