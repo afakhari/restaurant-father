@@ -124,3 +124,11 @@ Browser (table-scoped draft/typed note) → authenticated POST /api/ai/order-sug
 - کد مبنا: https://github.com/afakhari/restaurant-father/blob/main/src/server.mjs و https://github.com/afakhari/restaurant-father/blob/main/src/operations.mjs.
 
 **این سند design-ready است، نه production-ready.** مدل، هزینه، اتصال واقعی، UX مرورگر و قرارداد جدید باید در مراحل بعدی پیاده و آزموده شوند؛ هیچ نتیجه تست جدیدی در این سند ادعا نشده است.
+## Implemented slice / 2026-11-14
+
+- New endpoint: `POST /api/ai/order-suggestions` in `src/server.mjs`, requiring waiter/manager, validated UUID table/session/request, authenticated RLS tenant and a complete tenant menu read.
+- Parser & normalization: `src/ai-order.mjs`, with explicit unresolved output, conservative rule mode, no automatic persistence, payload limits and model ID/quantity allowlist.
+- Browser: editable menu/quantity/notes, line splitting, unresolved resolution/dismissal, table-revision matching, request cancellation and draft-only acceptance in `src/public/app.js`.
+- Final `POST /api/rounds` now optionally checks `expectedPriceToman`; a changed menu price returns HTTP 409 before insertion.
+- Tests: `tests/ai-order.test.mjs`, `tests/ai-golden.test.mjs`, integration tests and real-browser scripted acceptance.
+- Architecture limitations: local parser is not AI; provider-backed inference has not been verified with a real external model. Distributed rate limiting, durable offline drafts, multilingual speech-to-text, live allergen verification and extensive field trials remain out of scope. A robust 100K-user deployment needs more than this MVP.
