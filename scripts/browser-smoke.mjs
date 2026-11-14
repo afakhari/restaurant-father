@@ -156,6 +156,10 @@ try {
    assert.equal(await page.locator('#discount-input').inputValue(),'۱۲٬۰۰۰');
    assert.equal(await page.locator('#discount-input').getAttribute('data-identity'),'stable');
    assert.equal(await page.locator('[data-action="pay-method"][data-id="cash"]').getAttribute('aria-pressed'),'true');
+   await page.locator('.cash-table.selected').click();
+   assert.equal(await page.locator('#discount-input').inputValue(),'۱۲٬۰۰۰','Bill refresh must preserve unsubmitted discount');
+   assert.match(await page.locator('#discount-hint').innerText(),/هنوز ثبت نشده/,'Cashier must know discount is pending');
+
    await page.locator('#discount-input').fill('۱۰٬۰۰۰');
   await page.locator('[data-action="discount"]').click();
   await page.locator('[data-action="checkout"]').click();
