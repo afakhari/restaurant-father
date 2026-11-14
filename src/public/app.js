@@ -1,7 +1,7 @@
 import {searchKey,parseTomanInput,parseCountInput} from './iran-locale.js';
 const app=document.querySelector('#app'),toastElement=document.querySelector('#toast');
 const fmt=new Intl.NumberFormat('fa-IR');
-const state={me:null,data:null,view:'hall',branchId:null,tableId:null,cashTableId:null,cat:'همه',search:'',draft:[],roundKey:null,aiPreview:null,discountDraft:null,payMethod:'pos',busy:false,lastUpdate:null,poll:null,mobileStage:'tables',aiText:'',features:{aiEnabled:false},connection:'loading',pendingRefresh:false};
+const state={me:null,data:null,view:'hall',branchId:null,tableId:null,cashTableId:null,cat:'همه',search:'',draft:[],roundKey:null,aiPreview:null,aiRevision:0,aiRequest:null,aiLoading:false,aiWarning:'',discountDraft:null,payMethod:'pos',busy:false,lastUpdate:null,poll:null,mobileStage:'tables',aiText:'',features:{aiEnabled:false},connection:'loading',pendingRefresh:false};
 const labels={manager:'مدیر',waiter:'پیشخدمت',kitchen:'آشپزخانه',cashier:'صندوق‌دار',queued:'در صف',preparing:'در حال آماده‌سازی',ready:'آماده تحویل',served:'تحویل‌شده',cancelled:'لغوشده',cash:'نقدی',pos:'کارت‌خوان',card_to_card:'کارت‌به‌کارت'};
 const e=(s)=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
 const toman=(v)=>`${fmt.format(Number(v)||0)} تومان`;
@@ -25,13 +25,13 @@ function updateConnection(status){
  const node=document.querySelector('#sync-status');
  if(node){node.dataset.status=status;node.textContent=status==='offline'?'ارتباط قطع است':status==='loading'?'در حال همگام‌سازی…':'اطلاعات به‌روز است';}
 }
-function clearOrderDraft(){state.draft=[];state.roundKey=null;state.aiPreview=null;state.aiText='';}
+function clearOrderDraft(){state.aiRequest?.controller?.abort();state.aiRequest=null;state.aiRevision++;state.aiLoading=false;state.aiWarning='';state.draft=[];state.roundKey=null;state.aiPreview=null;state.aiText='';}
 function resetWorkspace(){
  clearOrderDraft();state.discountDraft=null;state.data=null;state.branchId=null;state.tableId=null;state.cashTableId=null;
  state.cat='همه';state.search='';state.payMethod='pos';state.mobileStage='tables';
  state.pendingRefresh=false;state.lastUpdate=null;state.features={aiEnabled:false};
 }
-function confirmDiscard(){return !state.draft.length||window.confirm('این میز پیش‌نویس ثبت‌نشده دارد. با خروج از آن، اقلام پیش‌نویس حذف می‌شوند. ادامه می‌دهید؟');}
+function confirmDiscard(){return !(state.draft.length||state.aiText.trim()||state.aiPreview)||window.confirm('این میز توضیح یا پیش‌نویس ثبت‌نشده دارد. با خروج از آن، متن و پیشنهاد حذف می‌شود. ادامه می‌دهید؟');}
 function keepViewportRender(){render();}
 async function run(action,{success='عملیات ثبت شد.'}={}){
  if(state.busy)return;
@@ -64,7 +64,102 @@ function syncMenuFilter(){
 }
 function menuList(){const categories=['همه',...new Set(state.data.menu.map(x=>x.category))];return `<div class="panel-head"><div><h2>منوی سفارش‌گیری</h2><small>قیمت‌ها از منوی همین رستوران</small></div><span class="pill">${fmt.format(state.data.menu.filter(x=>x.available).length)} غذا</span></div><div class="panel-body"><input id="menu-search" class="field menu-search" placeholder="جست‌وجوی غذا یا نوشیدنی…" value="${e(state.search)}" aria-label="جست‌وجوی منو"><div class="menu-cats" role="group" aria-label="دسته‌بندی منو">${categories.map(x=>`<button class="cat-chip ${state.cat===x?'active':''}" data-action="cat" data-id="${e(x)}" aria-pressed="${state.cat===x}">${e(x)}</button>`).join('')}</div><div class="menu-list">${menuItemsMarkup()}</div></div>`;}
 function draftPanel(){const t=state.data.tables.find(x=>x.id===state.tableId),s=t?sessionFor(t.id):null;const rounds=s?roundsFor(s.id):[];const items=s?itemsFor(s.id):[];return `<div class="panel-head"><div><h2>میز ${t?fmt.format(t.number):'…'} · سفارش جاری</h2><small>${s?`${fmt.format(rounds.length)} نوبت سفارش`:'هنوز سفارشی ثبت نشده است'}</small></div>${s?`<span class="pill">باز</span>`:''}</div><div class="panel-body"><h3 class="section-title">پیش‌نویس نوبت جدید</h3>${state.draft.map((d,i)=>{const m=state.data.menu.find(x=>x.id===d.menuItemId);return `<div class="draft-line"><div class="draft-line-header"><strong>${e(m?.name??'غذا')}</strong><span class="price">${toman(d.qty*(m?.price_toman??0))}</span></div><div class="qty-row"><button class="qty-btn" data-action="qty" data-id="${i}" data-dir="-1" aria-label="کاهش تعداد">−</button><b>${fmt.format(d.qty)}</b><button class="qty-btn" data-action="qty" data-id="${i}" data-dir="1" ${d.qty>=20?'disabled title="سقف هر ردیف ۲۰ عدد است"':''} aria-label="افزایش تعداد">+</button><button class="ghost-btn" data-action="remove-draft" data-id="${i}">حذف</button>${d.qty>1?`<button class="ghost-btn split-note" data-action="split-note" data-id="${i}" title="اگر یکی از این غذاها یادداشت متفاوت دارد">تفکیک برای یادداشت متفاوت</button>`:``}</div><input class="field note-field" data-draft-note="${i}" value="${e(d.note)}" maxlength="240" placeholder="یادداشت همین قلم، مثلاً بدون پیاز"></div>`;}).join('')||'<p class="blank" style="padding:15px 0">از منو غذا اضافه کنید.</p>'}<div class="ticket-summary"><span>مجموع نوبت جدید</span><span>${toman(state.draft.reduce((v,x)=>v+x.qty*(state.data.menu.find(m=>m.id===x.menuItemId)?.price_toman??0),0))}</span></div><button class="btn full" data-action="submit-round" ${state.draft.length?'':'disabled'}>ثبت نوبت و ارسال به آشپزخانه ↗</button>${can('waiter','manager')?aiPanel():''}<div class="divider"></div><h3 class="section-title">اقلام ثبت‌شده ${items.length?`(${fmt.format(items.length)})`:''}</h3>${rounds.map((r,i)=>`<div class="round-sep">نوبت ${fmt.format(i+1)} · ${date(r.created_at)}</div>${items.filter(x=>x.round_id===r.id).map(x=>`<div class="current-item"><div class="current-item-top"><strong>${fmt.format(x.quantity)} × ${e(x.name_snapshot)}</strong>${statusBadge(x.status)}</div>${x.note?`<p class="detail">یادداشت: ${e(x.note)}</p>`:''}<div class="actions">${x.status==='ready'?`<button class="btn sm secondary" data-action="transition" data-id="${x.id}" data-from="ready" data-to="served">✓ تحویل به مشتری</button>`:''}${(x.status==='queued'||(can('manager')&&['preparing','ready'].includes(x.status)))?`<button class="btn sm danger" data-action="cancel" data-id="${x.id}" data-from="${x.status}">${x.status==='queued'?'لغو قلم':'لغو با تأیید مدیر'}</button>`:''}</div></div>`).join('')}`).join('')||'<p class="blank">سابقه سفارشی برای این میز نیست.</p>'}</div>`;}
-function aiPanel(){const preview=state.aiPreview;return `<section class="ai-box"><strong style="font-size:12px">✦ ثبت سریع با دستیار فارسی</strong><p>جمله مشتری را بنویسید؛ نتیجه فقط پیشنهاد است و بدون تأیید ثبت نمی‌شود.</p><textarea class="field" id="ai-note" maxlength="320" placeholder="دو تا لاته، یکی کم‌شیر، و یک چیزکیک…">${e(state.aiText)}</textarea>${state.features.aiEnabled?`<button class="btn warm sm" data-action="ai-parse" style="margin-top:8px">استخراج اقلام با دستیار</button>`:`<p class="ai-unavailable">دستیار در این محیط فعال نیست؛ ثبت دستی سفارش بدون محدودیت در دسترس است.</p>`}${preview?`<div class="ai-preview">${preview.items.map((x,i)=>{const m=state.data.menu.find(m=>m.id===x.menuItemId);return `<div class="ai-preview-line"><label>${e(m?.name??'غذای نامشخص')}</label><div style="display:grid;grid-template-columns:72px 1fr;gap:7px"><input class="field" type="text" inputmode="numeric" pattern="[۰-۹٠-٩0-9]+" maxlength="2" data-ai-qty="${i}" value="${x.quantity}" aria-label="تعداد ${e(m?.name)}"><input class="field" data-ai-note="${i}" value="${e(x.note)}" placeholder="یادداشت غذا" aria-label="یادداشت ${e(m?.name)}"></div></div>`;}).join('')}${preview.unmatched?`<p style="color:#a35334">تشخیص‌داده‌نشده: ${e(preview.unmatched)}</p>`:''}<button class="btn sm full" data-action="ai-apply">تأیید و افزودن به پیش‌نویس</button></div>`:''}</section>`;}
+
+function aiMenuOptions(selected){
+ const items=state.data.menu.filter(m=>m.available);
+ return '<option value="">انتخاب غذا از منو</option>'+items.map(m=>'<option value="'+e(m.id)+'" '+(m.id===selected?'selected':'')+'>'+e(m.name)+'</option>').join('');
+}
+function aiValidContext(){
+ const p=state.aiPreview;if(!p)return false;
+ const c=p.context;
+ return !!state.me&&c.tableId===state.tableId&&c.branchId===state.branchId&&c.sessionId===(sessionFor(state.tableId)?.id??null)&&c.sourceRevision===state.aiRevision;
+}
+function aiReviewLine(line,i){
+ const item=state.data.menu.find(m=>m.id===line.menuItemId);
+ return '<div class="ai-review-line">'+
+ '<div class="ai-line-head"><b>قلم پیشنهادی '+fmt.format(i+1)+'</b><button type="button" class="ghost-btn" data-action="ai-remove" data-id="'+i+'">حذف</button></div>'+
+ (line.sourceText?'<p class="ai-evidence">از توضیح: «'+e(line.sourceText)+'»</p>':'')+
+ '<label class="label" for="ai-item-'+i+'">غذا یا نوشیدنی</label>'+
+ '<select id="ai-item-'+i+'" class="field" data-ai-menu="'+i+'">'+aiMenuOptions(line.menuItemId)+'</select>'+
+ '<div class="ai-edit-grid"><label class="label">تعداد<input class="field" data-ai-qty="'+i+'" inputmode="numeric" maxlength="2" value="'+e(line.quantity)+'" aria-label="تعداد قلم '+fmt.format(i+1)+'"></label>'+
+ '<label class="label">توضیح ویژه همان قلم<input class="field" data-ai-note="'+i+'" maxlength="240" value="'+e(line.note)+'" placeholder="مثلاً بدون شکر"></label></div>'+
+ '<div class="ai-line-bottom"><span class="price">'+(item?toman(item.price_toman*Number(parseCountInput(line.quantity)||0)):'ابتدا غذا را انتخاب کنید')+'</span>'+
+ (parseCountInput(line.quantity)>1?'<button type="button" class="ghost-btn" data-action="ai-split" data-id="'+i+'">تفکیک برای توضیح متفاوت</button>':'')+'</div>'+
+ (!item||!item.available?'<p class="ai-error">این غذا موجود نیست؛ یک گزینه معتبر انتخاب کنید.</p>':'')+
+ '</div>';
+}
+function aiUnresolvedLine(u,i){
+ const reason={unmatched:'در منو پیدا نشد یا مبهم است',unknown_menu_item:'شناسه پیشنهادی در منوی این رستوران نیست',invalid_quantity:'تعداد نامعتبر است',invalid_note:'توضیح بیش از حد مجاز است',invalid_item:'قلم پیشنهادی نامعتبر است',ambiguous_unit_note:'توضیح به واحد مشخصی نسبت داده نشده',extra_text:'بخشی از متن به‌روشنی قابل تبدیل نبود',too_many_lines:'سقف ۱۲ ردیف در یک نوبت رعایت نشده'}[u.reason]||'نیازمند بررسی است';
+ return '<div class="ai-unresolved-item"><p><strong>«'+e(u.text)+'»</strong><span class="ai-reason"> '+e(reason)+'</span></p>'+
+ '<div class="ai-unresolved-controls"><select class="field" data-ai-resolve="'+i+'" aria-label="تعیین غذای عبارت '+fmt.format(i+1)+'">'+aiMenuOptions('')+'</select>'+
+ '<button class="ghost-btn" type="button" data-action="ai-dismiss" data-id="'+i+'">کنار گذاشتن</button></div></div>';
+}
+function aiPanel(){
+ const p=state.aiPreview,active=state.features.aiEnabled,valid=aiValidContext();
+ const table=state.data.tables.find(t=>t.id===state.tableId);
+ return '<section class="ai-box" aria-label="تبدیل توضیح سفارش به پیشنهاد">'+
+ '<div class="ai-header"><div><h3>ثبت سریع با توضیح سفارش</h3><p>سفارش مشتری را همان‌طور که می‌گوید بنویسید؛ نتیجه قابل اصلاح است.</p></div><span class="ai-mode">'+(active?'مدل زبانی':'تطبیق ساده با منو')+'</span></div>'+
+ '<p class="ai-target">میز '+fmt.format(table?.number??0)+' · '+e(selectedBranch()?.name??'')+'</p>'+
+ '<label for="ai-note" class="label">توضیح سفارش مشتری</label>'+
+ '<textarea class="field ai-textarea" id="ai-note" maxlength="800" placeholder="مثلاً: سه تا لاته، یکی بدون شکر، دوتا معمولی و یک چیزکیک">'+e(state.aiText)+'</textarea>'+
+ '<p class="ai-helper">اطلاعات تماس یا کارت مشتری را ننویسید. هیچ پیشنهادی بدون تأیید شما ثبت نمی‌شود.</p>'+
+ '<div class="ai-actions"><button type="button" class="btn warm sm" data-action="ai-parse" '+(state.aiLoading?'disabled':'')+'>'+(state.aiLoading?'در حال بررسی سفارش…':active?'تحلیل با دستیار':'ساخت پیشنهاد از منو')+'</button>'+
+ (state.aiText||p?'<button type="button" class="ghost-btn" data-action="ai-clear">پاک کردن توضیح</button>':'')+'</div>'+
+ (!active?'<p class="ai-helper">در این محیط مدل AI متصل نیست. تطبیق محدود و قانون‌محور است؛ برای عبارت‌های مبهم، انتخاب دستی لازم است.</p>':'')+
+ (state.aiWarning?'<p class="ai-error" role="alert">'+e(state.aiWarning)+'</p>':'')+
+ '<div aria-live="polite" role="status" class="ai-status">'+(state.aiLoading?'در حال تهیه پیشنهاد برای همین میز…':p? 'پیشنهاد آماده بازبینی است. تا ثبت نهایی چیزی به آشپزخانه ارسال نمی‌شود.':'')+'</div>'+
+ (p?'<section class="ai-preview" aria-label="پیشنهاد قابل ویرایش"><div class="ai-preview-title"><h4>پیشنهاد قابل ویرایش</h4><span>'+fmt.format(p.items.length)+' ردیف</span></div>'+
+ (!valid?'<p class="ai-error">توضیح یا نشست میز تغییر کرده است. دوباره تحلیل کنید.</p>':'')+
+ p.items.map(aiReviewLine).join('')+
+ (p.unresolved.length?'<div class="ai-unresolved"><h4>'+fmt.format(p.unresolved.length)+' عبارت نیازمند تعیین تکلیف</h4><p>برای هر مورد، غذای درست را انتخاب یا صریحاً کنار بگذارید.</p>'+
+ p.unresolved.map(aiUnresolvedLine).join('')+'</div>':'')+
+ '<div class="ai-review-actions"><button type="button" class="btn secondary sm" data-action="ai-add-line" '+(p.items.length>=12?'disabled':'')+'>افزودن ردیف</button>'+
+ '<button type="button" class="btn sm" data-action="ai-apply" '+(!valid||p.unresolved.length||!p.items.length?'disabled':'')+'>افزودن اقلام تأییدشده به پیش‌نویس</button></div>'+
+ '<p class="ai-helper">این مرحله فقط پیش‌نویس را تغییر می‌دهد. ارسال به آشپزخانه با دکمه ثبت نوبت انجام می‌شود.</p></section>':'')+
+ '</section>';
+}
+async function analyzeOrder(){
+ const text=state.aiText.trim();
+ if(text.length<4||text.length>800){state.aiWarning='توضیح سفارش باید بین ۴ تا ۸۰۰ نویسه باشد.';render();document.querySelector('#ai-note')?.focus();return;}
+ if(!state.tableId||!state.me)return;
+ state.aiRequest?.controller?.abort();
+ const controller=new AbortController(),requestId=crypto.randomUUID(),revision=++state.aiRevision;
+ const tableId=state.tableId,branchId=state.branchId,sessionId=sessionFor(tableId)?.id??null,actorId=state.me.id;
+ const request={controller,requestId,revision,tableId,branchId,sessionId,actorId};
+ state.aiRequest=request;state.aiLoading=true;state.aiPreview=null;state.aiWarning='';render();
+ try{
+  const response=await api('/api/ai/order-suggestions',{method:'POST',signal:controller.signal,body:JSON.stringify({note:text,tableId,expectedSessionId:sessionId,clientRequestId:requestId,sourceRevision:revision})});
+  if(state.aiRequest!==request||state.aiRevision!==revision||state.tableId!==tableId||state.branchId!==branchId||state.me?.id!==actorId||state.aiText.trim()!==text||sessionFor(tableId)?.id!==sessionId||response.clientRequestId!==requestId)return;
+  state.aiPreview=response;
+  if(response.unresolved?.length)state.aiWarning='بخشی از سفارش روشن نیست؛ پیش از افزودن، موارد مشخص‌شده را بررسی کنید.';
+ }catch(err){
+  if(state.aiRequest!==request||err.name==='AbortError')return;
+  state.aiWarning=err.message||'تحلیل سفارش انجام نشد؛ متن شما حفظ شده است.';
+ }finally{
+  if(state.aiRequest===request){state.aiRequest=null;state.aiLoading=false;render();}
+ }
+}
+function applyAI(){
+ const p=state.aiPreview;if(!p||!aiValidContext()){notify('این پیشنهاد متعلق به وضعیت فعلی میز نیست؛ دوباره تحلیل کنید.',true);return;}
+ if(p.unresolved.length){notify('ابتدا برای عبارت‌های مبهم تصمیم بگیرید.',true);return;}
+ if(!p.items.length){notify('هیچ قلمی برای افزودن وجود ندارد.',true);return;}
+ const next=state.draft.map(x=>({...x}));
+ for(const line of p.items){
+  const menu=state.data.menu.find(m=>m.id===line.menuItemId&&m.available);
+  const quantity=parseCountInput(line.quantity);
+  if(!menu){notify('یک غذا از منو حذف یا ناموجود شده است. پیشنهاد را اصلاح کنید.',true);return;}
+  if(!quantity||typeof line.note!=='string'||line.note.length>240){notify('تعداد یا توضیح یکی از اقلام معتبر نیست.',true);return;}
+  if(Number(menu.price_toman)!==Number(line.priceToman)){
+   line.priceToman=Number(menu.price_toman);state.aiWarning='قیمت منو تغییر کرده است. قیمت جدید را بررسی و دوباره تأیید کنید.';render();return;
+  }
+  const same=next.find(x=>x.menuItemId===menu.id&&x.note===line.note&&x.expectedPriceToman===Number(menu.price_toman)&&x.qty+quantity<=20);
+  if(same)same.qty+=quantity;
+  else next.push({menuItemId:menu.id,qty:quantity,note:line.note,expectedPriceToman:Number(menu.price_toman)});
+ }
+ if(next.length>12){notify('سقف هر نوبت ۱۲ ردیف است؛ اقلام را در چند نوبت ثبت کنید.',true);return;}
+ state.draft=next;state.roundKey=null;state.aiPreview=null;state.aiText='';state.aiWarning='';activateHallStage('order');
+ notify('اقلام به پیش‌نویس اضافه شدند. برای ارسال، نوبت را جداگانه ثبت کنید.');
+}
 function hall(){const branch=selectedBranch(),quantity=state.draft.reduce((n,x)=>n+x.qty,0),total=state.draft.reduce((n,x)=>n+x.qty*(state.data.menu.find(m=>m.id===x.menuItemId)?.price_toman??0),0),ready=currentTables().reduce((n,t)=>n+readyCount(t.id),0);return `${title('عملیات سالن','سفارش‌گیری میزها',`شعبه ${branch?.name??''} · سفارش چندمرحله‌ای بدون گم‌شدن اقلام`,ready?`<span class="ready-headline">${fmt.format(ready)} قلم آماده تحویل</span>`:'')}<nav class="hall-steps" aria-label="مراحل سفارش‌گیری">${[['tables','۱ · میزها'],['menu','۲ · منو'],['order','۳ · سفارش']].map(([id,label])=>`<button class="hall-step ${state.mobileStage===id?'active':''}" data-action="hall-step" data-id="${id}" aria-current="${state.mobileStage===id?'step':'false'}">${label}${id==='order'&&quantity?` <span class="step-count">${fmt.format(quantity)}</span>`:''}</button>`).join('')}</nav><div class="hall-layout" data-mobile-stage="${state.mobileStage}"><section class="card hall-tables"><div class="panel-head"><div><h2>میزهای سالن</h2><small>یک میز را برای ثبت یا تحویل انتخاب کنید</small></div><span class="pill">${fmt.format(currentTables().length)} میز</span></div><div class="panel-body"><div class="tables-grid">${currentTables().map(tableCard).join('')}</div><div class="chip-explain"><span>● آزاد / مشغول</span><span>● آماده تحویل</span></div></div></section><section class="card hall-menu">${menuList()}</section><section class="card hall-order">${draftPanel()}</section></div>${quantity?`<div class="mobile-draft-bar" role="region" aria-label="پیش‌نویس سفارش"><div><strong>${fmt.format(quantity)} قلم در پیش‌نویس</strong><span>${toman(total)}</span></div><button class="btn" data-action="hall-step" data-id="${state.mobileStage==='order'?'menu':'order'}">${state.mobileStage==='order'?'بازگشت به منو':'بازبینی سفارش'}</button></div>`:''}`;}
 function allKitchenItems(){const valid=new Set(currentTables().map(x=>x.id));const sessions=activeSessions().filter(x=>valid.has(x.table_id));return sessions.flatMap(s=>itemsFor(s.id).map(i=>({item:i,session:s,table:state.data.tables.find(t=>t.id===s.table_id)})));}
 function kdsTicket(row){const x=row.item,minutes=(Date.now()-new Date(x.updated_at).getTime())/60000;const urgent=minutes>12&&x.status!=='ready';return `<article class="kds-ticket ${urgent?'urgent':''}"><div class="kds-ticket-head"><div><strong>میز ${fmt.format(row.table?.number??0)}</strong> <small>· ${e(labels[x.status])}</small></div><span class="pill ${urgent?'alert':'queued'}">${since(x.updated_at)}</span></div><div class="kds-ticket-body"><strong>${fmt.format(x.quantity)} × ${e(x.name_snapshot)}</strong><p>${e(state.data.menu.find(m=>m.id===x.menu_item_id)?.category??'سفارش')}</p>${x.note?`<div class="kds-note">⚠ ${e(x.note)}</div>`:''}${x.status==='queued'?`<button class="btn kds-action" data-action="transition" data-id="${x.id}" data-from="queued" data-to="preparing">شروع آماده‌سازی</button>`:x.status==='preparing'?`<button class="btn warm kds-action" data-action="transition" data-id="${x.id}" data-from="preparing" data-to="ready">✓ آماده شد · اطلاع به سالن</button>`:`<div class="okay-box">آماده است؛ منتظر تحویل پیشخدمت</div>`}</div></article>`;}
