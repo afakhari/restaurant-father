@@ -5,10 +5,14 @@ services:
       POSTGRES_DB: shiftyar
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:-local-admin-password-change}
+    # The image's temporary init server listens on a Unix socket only.
+    # Probe TCP so Compose cannot mark PostgreSQL healthy before first init finishes.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d shiftyar"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d shiftyar"]
       interval: 3s
-      retries: 25
+      timeout: 5s
+      retries: 30
+      start_period: 20s
     volumes:
       - shiftyar_pgdata:/var/lib/postgresql/data
   migrate:
