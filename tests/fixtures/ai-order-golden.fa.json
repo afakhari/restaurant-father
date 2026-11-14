@@ -2,7 +2,7 @@
   "version": 1,
   "locale": "fa-IR",
   "sourceMenu": "scripts/seed.mjs (Narenj fixture)",
-  "status": "pre-implementation human-review required, not executed",
+  "status": "14 deterministic Persian cases executed as unit regression; external AI provider not executed; other examples are review references",
   "guidance": "Semantic expectation examples, not automatic claims of model accuracy. ExpectedUnresolved may be surfaced as a review warning; never silently ignored.",
   "cases": [
     {
