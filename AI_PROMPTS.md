@@ -39,3 +39,12 @@ ChatGPT/GPT-6 performed a substantial proportion of coding and documentation, un
 - «حواست باشه محصول باید از همه نظر مناسب فارسی و ایران باشه. لغزش گاه ها و سناریو های مختلف رو بررسی کن و مطمئن شو همه چیز کامل است و هر کاربر همان چیزی که باید را به بهترین شکل می بیند و همه ی امکانات لازم را در اختیار دارد. اقدامات لازم را انجام بده به طور کامل و مطمئن شو همه چیز کامل و بدون نقص است»
 
 The review led to localized input validation, role-scoped read responses, and manager-only exception paths. The reviewer should not interpret this instruction as evidence that every possible edge case has been solved or that an unconnected live deployment exists.
+
+
+## Subsequent user-directed AI order-intake extension (actual user instructions)
+
+- «من میخواهم که یک ساز و کار حرفه ای پیاده شود تا برای ثبت سفارش، سفارش توضیح داده شود و بعد تبدیل به پیشنهاد برای سفارش شود و امکان اصلاح داشته باشد و ... به دقت بررسی کامل کن و ایرادات احتمالی و لغزش گاه های احتمالی را به دقت شناسایی کن و تمامی کار هایی که پیش از پیاده سازی نیاز است به دقت انجام بده»
+- «تمامی ایرادات را بر طرف کن همچنین بر اساس شرح تسک من فایل ها را به روز کن. تمامی ایرادات را بر طرف کن و یک پیاده سازی کاملا حرفه ای انجام بده»
+
+The new \`modelOrderSuggestions()\` system prompt is in \`src/server.mjs\`, source-of-truth for \`POST /api/ai/order-suggestions\`. It instructs the model to return JSON with menu IDs, integer quantities, per-item preparation notes, source phrases, and unmatched text. It explicitly forbids guessed IDs, changing prices, payments, permissions and posting orders. User order text and menu entries are untrusted, and the server validates the reply. The older verbatim prompt quoted above applies only to the legacy \`/api/ai/parse\` route, not the new UI. A local simulated provider in tests is not evidence of real provider availability or quality.
+
