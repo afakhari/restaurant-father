@@ -114,6 +114,8 @@ try {
   // Rule-based demo must be described honestly and remain usable without a paid provider.
   await page.locator('#ai-note').fill('دو تا لاته، یکی کم‌شیر و نوشابه');
   await page.locator('[data-action="ai-parse"]').click();
+  await page.waitForTimeout(550);
+  console.log('AI_PREVIEW_DIAGNOSTIC',JSON.stringify({panel:(await page.locator('.ai-box').innerText()).slice(0,1600),lines:await page.locator('.ai-review-line').count(),errors:consoleErrors}));
   await page.locator('.ai-review-line').first().waitFor();
   assert.match(await page.locator('.ai-mode').innerText(),/تطبیق ساده|مدل زبانی/);
   assert.equal(await page.locator('.ai-review-line').count(),2,'Different drink preparation notes need different rows');
