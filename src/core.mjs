@@ -16,7 +16,8 @@ export function parseRound(body) {
     const menuItemId=requireUuid(x.menuItemId,'غذا');
     const quantity=requireInt(x.quantity,1,20,'تعداد');
     if(typeof x.note!=='string'||x.note.length>240)throw new HttpError(400,'VALIDATION','یادداشت طولانی یا نامعتبر است.');
-    return {menuItemId,quantity,note:x.note.trim()};
+    const expectedPriceToman=x.expectedPriceToman===undefined?undefined:requireInt(x.expectedPriceToman,0,1000000000,'قیمت مورد انتظار');
+    return {...(expectedPriceToman===undefined?{}:{expectedPriceToman}),menuItemId,quantity,note:x.note.trim()};
   });
   return {tableId,expectedSessionId,idempotencyKey,items};
 }
