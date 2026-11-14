@@ -121,6 +121,10 @@ npm run test:integration
 
 The current suite has **9 unit tests** (including Persian/Arabic input parsing) and **11 PostgreSQL integration tests**. Integration coverage includes a complete waiter → kitchen → waiter → cashier sequence; concurrent rounds; edited retry idempotency (quantity/note mismatches); role-specific response privacy; manager-only cancellation/void with no fake payment; RLS without tenant context; cross-tenant known-ID requests; and CSRF origin mismatch. The GitHub Actions workflow provisions Postgres 16 to run these checks. **Local limitation of the authoring environment:** no Docker daemon or npm registry access, so unit tests and syntax checks were run locally; real DB integration must be confirmed by CI. A passing CI status is required before calling this production-tested.
 
+## Free public reviewer demo (Render + Neon)
+
+This repository includes a free-tier Render Blueprint in [render.yaml](render.yaml), a manual database bootstrap workflow, and an HTTPS acceptance script. **No public demo is deployed or verified yet.** Use [راهنمای انتشار رایگان](docs/FREE_DEMO_DEPLOY.fa.md) for the exact order, secret handling and reviewer checklist. The hosted runtime only receives the restricted `restaurant_runtime` database URL, never the Neon owner connection string. The public link must be tested before submitting it.
+
 ## Production deployment
 
 Read [DEPLOY.md](DEPLOY.md) before putting this behind HTTPS. Do not deploy with demo passwords or a seeded public trial on the same database as real customers. A live HTTPS URL, real demo credentials, and a recorded walkthrough remain external submission requirements; they are **not fabricated by this repo**.

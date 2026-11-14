@@ -21,7 +21,8 @@ permissions:
   contents: read
 jobs:
   chromium-shift:
-    runs-on: ubuntu-latest
+    # Playwright 1.55 chromium install does not support Ubuntu 26.04 default runners.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       postgres:

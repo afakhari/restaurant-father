@@ -4,6 +4,8 @@
 https://github.com/afakhari/restaurant-father
 
 ## Live Demo URL
+Deployment recipe: [docs/FREE_DEMO_DEPLOY.fa.md](docs/FREE_DEMO_DEPLOY.fa.md) plus [render.yaml](render.yaml) and the manual GitHub Actions bootstrap workflow. This recipe does not substitute for the real URL.
+
 **PENDING.** A Railway/Render/other hosting account must be connected, a persistent PostgreSQL 16 database and Node 22 server provisioned, private runtime credentials configured, HTTPS enabled and the real URL checked. Do not enter a GitHub repo URL or static mock as a live app URL.
 
 ## Demo Login Credentials
