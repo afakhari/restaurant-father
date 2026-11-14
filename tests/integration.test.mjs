@@ -197,6 +197,21 @@ test('new order suggestions stay bound to table, tenant and role and never write
  }
 });
 
+test('suggestion kill switch returns a clear error without disabling manual workflow',async()=>{
+ const prior=process.env.AI_ORDER_ENABLED;process.env.AI_ORDER_ENABLED='false';
+ try{
+  const current=(await shift('waiter')).body;
+  const table=current.tables.find(t=>t.number===3&&sessionFor(current,t.id));
+  const session=sessionFor(current,table.id);
+  const r=await request('waiter','POST','/api/ai/order-suggestions',{
+   tableId:table.id,expectedSessionId:session.id,clientRequestId:crypto.randomUUID(),sourceRevision:1,note:'دو عدد لاته'
+  });
+  assert.equal(r.status,503);assert.equal(r.body.error.code,'ORDER_SUGGESTIONS_DISABLED');
+  assert.equal((await request('waiter','GET','/api/me')).body.features.orderSuggestionsEnabled,false);
+  assert.equal((await shift('waiter')).status,200);
+ }finally{if(prior===undefined)delete process.env.AI_ORDER_ENABLED;else process.env.AI_ORDER_ENABLED=prior;}
+});
+
 test('natural-language suggestions report invalid provider IDs instead of inserting them',async()=>{
  const before=(await shift('waiter')).body;
  const table=before.tables.find(t=>t.number===3&&sessionFor(before,t.id)),session=sessionFor(before,table.id);
