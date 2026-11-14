@@ -1,111 +1,143 @@
-# DECISIONS — ShiftYar
+# DECISIONS | ShiftYar (شیفت‌یار)
 
-Each decision documents **decision / why / alternative / accepted trade-off**, recorded during implementation. The first two explicitly identify choices we would revisit.
+**Decision record, reviewed 2026-11-14.** Decisions are written as **choice → rationale → rejected alternative → cost / reversal trigger**. They describe architectural and product reasoning, not interviews, benchmarks or load tests that did not happen. The candidate reports **about six productive hours total across non-consecutive work sessions**. Dates in the repository describe the sequence of decisions, not continuous engineering time.
 
-## D-01 — One table session, many order rounds (keep)
-- **Decision:** Each physical table has at most one active session; a session can contain any number of appended rounds and individually tracked order items.
-- **Why:** In an Iranian full-service restaurant customers commonly add drinks or dessert after the first order. Replacing an entire order on each update can lose concurrent changes.
-- **Alternative:** A single mutable order JSON document for each table, overwritten on every edit.
-- **Trade-off:** More relational entities and explicit session lifecycle in return for safer updates and accurate final billing.
+## The product bet
 
-## D-02 — Table-scoped serialization and idempotent order creation (keep)
-- **Decision:** For each mutation take a transaction-scoped advisory lock keyed by table UUID before locking its session row; add rounds transactionally; use a client-generated idempotency UUID; verify item status on writes.
-- **Why:** Two waiters and kitchen/cashier may act on the same table. Network retries can duplicate charges.
-- **Alternative:** Optimistic full-document PUT with only a version counter, or a distributed queue.
-- **Trade-off:** Hot-table contention and additional round-trip latency. This is acceptable for a small branch and clearly breaks under severe table-specific write contention.
+The initial brief did not supply screens or a feature list. The essential bet was that a restaurant benefits more from **one consistent shift-to-settlement transaction path** than from a large, partially implemented POS. An employee's most damaging mistakes are losing an added order, giving the kitchen an unclear instruction, closing a table prematurely or seeing another restaurant's data.
 
-## D-03 — Tenant scoped DB role and FORCE RLS (keep, harden later)
-- **Decision:** All business tables use FORCE RLS and a non-superuser runtime role. A transaction-local tenant context is set only after verifying the user's session.
-- **Why:** A missing tenant filter in a new query should not leak another restaurant's menu or orders.
-- **Alternative:** Application-only `WHERE restaurant_id = ...`; separate database per restaurant; security-definer RPC with signed tenant context.
-- **Trade-off:** Operational migrations require an owner role, transaction context must be set consistently, and mutable GUC context is not sufficient against a compromised DB connection/SQL execution. Restrict runtime credential access; consider signed context RPC for production.
+Therefore we intentionally built a narrow, Persian-first operational slice: **table → multiple rounds → individual kitchen items → physical handoff → externally received payment recorded by cashier**. Its success is demonstrable with fictional data; any claim of operational improvement needs future field measurement.
 
-## D-04 — Role-specific UI and transition rules (keep)
-- **Decision:** Waiter, kitchen, cashier and manager have separate default pages and actions. `READY` and `SERVED` are not the same event.
-- **Why:** Restaurant staff need one obvious next step, not a generic admin dashboard. Kitchen readiness does not prove that food reached the guest.
-- **Alternative:** One universal employee dashboard with a status dropdown for everyone.
-- **Trade-off:** Four demo accounts and navigation are needed; each new step requires testing its role boundary.
+## D-01 · One active table session; append-only order rounds
+**Choice:** Each table has at most one open session; later orders add rounds, never replace earlier rounds. Items independently track status and notes.
 
-## D-05 — Block normal checkout until all items delivered (REVISIT / likely wrong for real restaurants)
-- **Decision:** The cashier can close the table only when every non-cancelled item is `SERVED` and at least one item was served.
-- **Why:** It prevents accidentally abandoning a plate while closing the bill, a useful MVP invariant.
-- **Alternative:** Allow settling before delivery with an explicit managerial exception and an open kitchen handoff after payment.
-- **Trade-off:** Guests may pay early, leave while waiting for takeaway, or have legitimate exceptions. The current UX is deliberately strict and may be **wrong** for some real service patterns. Next design: manager-authorized early settlement that does not silently delete kitchen tasks.
+**Why:** Guests often request additional drinks and desserts while an earlier order is being prepared. A mutable all-in-one table JSON would be easy to overwrite during concurrent work.
 
-## D-06 — Poll every five seconds instead of push delivery (REVISIT / likely wrong for a busy kitchen)
-- **Decision:** Shared state is fetched via `/api/shift` every five seconds; the frontend does not maintain a WebSocket.
-- **Why:** A simple, observable fallback avoids spending the six-hour window on reconnect edge cases.
-- **Alternative:** Server-Sent Events per tenant/branch, realtime broadcasts, or WebSocket hub.
-- **Trade-off:** A new ready plate can take five seconds to appear on the waiter's screen and many browsers repeat a relatively large query. This is **wrong** for high-volume service; use change-stream-driven narrow subscriptions once correctness is proven.
+**Alternative rejected:** A single mutable order document updated with PUT after every edit.
 
-## D-07 — Integer toman and price snapshots (keep)
-- **Decision:** Store menu/receipt amounts as safe integer toman; every order item snapshots server-side name and price.
-- **Why:** Clear Iranian pricing semantics and deterministic bills when prices are changed later.
-- **Alternative:** decimal rial accounting ledger or floating point client totals.
-- **Trade-off:** Explicit rial conversion and tax/fiscal integration are deferred. No current legal invoicing claim is made.
+**Cost / revisit:** Extra relational entities and explicit lifecycle transitions. Revisit for non-table services such as takeaway or delivery, not by weakening the table invariant.
 
-## D-08 — Bounded AI note-to-item preview (keep, provider conditional)
-- **Decision:** An optional LLM suggests only menu item IDs, quantities and item notes; server validates and a staff member must explicitly approve.
-- **Why:** Reduces repetitive order entry in Persian, while avoiding incorrect pricing and uncontrollable writes.
-- **Alternative:** AI chat waiter, auto-sending recognized orders to kitchen, or AI-driven stock/recommendations.
-- **Trade-off:** Requires a paid provider key, incurs small latency and cost, may fail or misinterpret spoken language. Manual ordering remains first-class. Without credentials this capability is honestly unavailable.
+## D-02 · Transactional table serialization plus payload-aware idempotency
+**Choice:** Serialize writes on a table with a PostgreSQL transaction advisory lock, version-check state-changing operations, and persist a client-generated idempotency key for each added round. A replay must match the table **and canonical item IDs, quantities and preparation notes**; edited reuse returns HTTP 409. The key is checked again after acquiring the table lock.
 
-## D-09 — Zero-build vanilla browser UI (keep within challenge)
-- **Decision:** A small single-page RTL interface in HTML/CSS/JS with accessible buttons, labels, branch switcher and role-aware screens.
-- **Why:** Enables focused UX work without build-tool overhead, especially since the repository initially contained only a license file.
-- **Alternative:** Next.js app router + component library or a multi-package React monorepo.
-- **Trade-off:** Explicit rendering and event delegation grow less maintainable at larger feature count; migrate to components as teams/features expand.
+**Why:** A lost HTTP response must not cause two kitchen tickets or report that a changed retry was recorded when it was not. Concurrent waiters must not overwrite one another.
 
-## D-10 — Dedicated migration container and local Docker Compose (keep)
-- **Decision:** A one-shot migrator has owner credentials and the runtime only has tenant data privileges; migrations/seed happen before the app starts.
-- **Why:** The application should not run with DDL rights or SUPERUSER privileges just to load its tables.
-- **Alternative:** One shared Postgres superuser credential for everything.
-- **Trade-off:** A service ordering/deployment step and two DB passwords are required. Changing database schema across large environments later needs versioned, reversible migrations rather than just replaying initial setup SQL.
+**Alternative rejected:** Client-side disabling alone, a document overwrite, or replay keyed only by UUID irrespective of content.
 
+**Cost / revisit:** A frequently contested table serializes its writes; retries sometimes require explicit staff review. Benchmark under real peak service before considering narrower locks.
 
-## D-11 — Small-screen step-by-step ordering (keep)
-- **Decision:** Keep the three-pane desktop workplace, but use explicit Tables → Menu → Order steps and a fixed draft summary under 1000px.
-- **Why:** A phone-sized employee interface used to place the cart after a long list of tables and dishes. A busy waiter must be able to inspect the cart without retracing the whole page.
-- **Alternative:** One continuously scrolling vertical page or a slide-over cart with nested gestures.
-- **Trade-off:** One extra tap when switching between menus and table context; clearer navigation and fewer accidental actions.
+## D-03 · Tenant context at the server and PostgreSQL FORCE RLS
+**Choice:** Derive the restaurant from authenticated staff membership, use a restricted runtime DB user, set tenant context per transaction, and enforce FORCE ROW LEVEL SECURITY on restaurant-owned tables.
 
-## D-12 — Guard navigation and provide native accessible dialog (keep, revisit)
-- **Decision:** Ask for confirmation before clearing a draft during table/branch/logout switches, and use a styled in-app dialog for cancellation and cashier receipt confirmation.
-- **Why:** Draft loss costs a real order, and irreversible money-related actions merit explicit language.
-- **Alternative:** Persist every draft server-side and support resumption across devices, or a keyboard-only native browser confirmation.
-- **Trade-off:** In-memory draft is still lost on a hard crash or session expiry. Persistent cross-device drafts and a full accessibility audit remain future work.
+**Why:** Application-level WHERE clauses are easy to forget when adding a report, search or new endpoint. Database-level rejection adds a second boundary.
 
+**Alternative rejected:** Trusting tenant IDs supplied by the browser; relying exclusively on application filters; a separate database for every tiny restaurant from day one.
 
-## D-13 — Manager-only cancellation of started tickets and zero-payment void (scope refinement)
-- **Decision:** Allow manager cancellation of PREPARING/READY-but-not-SERVED items with a recorded reason; add a guarded, version-checked close operation only for sessions whose *every* item is cancelled. Payment fields remain NULL.
-- **Why:** A stockout after cooking begins or a fully cancelled order would otherwise leave the table permanently blocked or force staff to fabricate service/payment. This is a correction discovered through live-shift exception review, not an added POS module.
-- **Alternative:** Staff manually mark cancelled food served and invent a zero-toman transaction, or allow all roles to cancel at any stage.
-- **Trade-off:** More state transitions, an explicit extra endpoint and regression tests. The original `SCOPE.md` remains the pre-build agreement; this deviation is explicitly recorded here. Served-item refunds are still excluded.
+**Cost / revisit:** Additional migration/runtime roles and strict transaction discipline. A compromised runtime DB connection that can change tenant context remains a risk; stronger signed context or restricted RPC should be evaluated before production multi-tenancy. RLS is not a claim of immunity to all SQL compromise.
 
-## D-14 — Role-specific API projection, not just navigation (security correction)
-- **Decision:** Kitchen responses omit prices, discounts, payment and event history; waiter responses omit historical receipts and manager audit; cashier receives current/closed billing information without the editable menu feed. Manager retains cross-workflow events.
-- **Why:** Hiding checkout tabs in the browser is not data authorization. A kitchen employee can inspect a JSON response even when the UI does not show a receipt.
-- **Alternative:** Return one rich `/api/shift` payload to everyone and hide fields using CSS/JavaScript.
-- **Trade-off:** The shared snapshot endpoint now applies explicit response projections; future roles need carefully tested privacy contracts, ideally separate read endpoints.
+## D-04 · Four task-oriented roles with authorization in *responses and writes*
+**Choice:** Waiter, kitchen, cashier and manager receive relevant actions and JSON projections. Kitchen does not get payment or price fields; waiter does not get paid receipt history or management audit; cashier cannot change cooking status. Manager has explicitly bounded exception actions.
 
-## D-15 — Locale normalization only at presentation/input boundary
-- **Decision:** Accept Persian/Arabic/Latin digits and grouping for cashier discount, normalize Persian/Arabic keyboard variants for menu search, and allow distinct notes for identical food items. Server APIs still require validated integer toman, not strings or rial.
-- **Why:** Iranian staff may use heterogeneous mobile keyboards; manual correction is costly during a shift.
-- **Alternative:** Require ASCII digits and exact Persian spelling everywhere.
-- **Trade-off:** Dedicated input parsing and tests; no automatic currency inference or fractional money is permitted.
+**Why:** Hiding a tab is not access control. A legitimate employee can inspect network responses.
 
+**Alternative rejected:** A single dashboard and one rich unrestricted /api/shift JSON object for every login.
 
-## D-16 — Reject edited retries rather than silently reuse a prior round
-- **Decision:** Idempotency replay verifies the original item IDs, quantities and notes in a canonical order; changed payloads return 409 and require the waiter to review the table and submit a fresh round.
-- **Why:** The server may commit an order while its network response is lost. A subsequent edited retry must not report success for an older, different order.
-- **Alternative:** Deduplicate solely by actor-provided idempotency key, regardless of content.
-- **Trade-off:** One small indexed lookup of original order lines on replay; bounded to twelve lines per round.
+**Cost / revisit:** More authorization tests, response-shape maintenance and role switching in the demo. Branch-specific staff membership remains unimplemented and would matter for chains.
 
+## D-05 · Distinguish READY from SERVED
+**Choice:** Kitchen marks an item READY; only a waiter/authorized manager marks it SERVED after handoff.
 
-## D-17 — Editable natural-language order proposals with truthful non-AI fallback (later enhancement)
+**Why:** Preparation completion is not evidence that the guest received the food. This distinction also underpins settlement checks.
 
-- **Decision:** Suggestions belong to a verified restaurant/table/session and a particular source-text revision. Unmatched and invalid entries remain visible. Staff edit menu items, quantities and per-unit notes, then explicitly add to the draft; final submission is a separate server transaction. A limited deterministic fallback is labeled non-AI.
-- **Why:** Ambiguous Persian restaurant utterances, different preparation requirements and in-flight table switching make auto-submission unsafe. Price snapshot expectations reject silent price changes between review and kitchen submission.
-- **Alternative:** Unvalidated LLM JSON inserts, auto-posted orders and paid provider dependency for every waiter action.
-- **Trade-off:** Ambiguity still needs human decisions, and a shared distributed limiter/cost budget and legally available provider are needed before scaling. This work was requested after the original six-hour MVP.
+**Alternative rejected:** One “done” state representing both kitchen completion and guest delivery.
 
+**Cost / revisit:** One extra interaction for staff. Reduce friction with better notifications rather than corrupting the meaning of status.
+
+## D-06 · Block ordinary checkout on unserved items **[revisit]**
+**Choice:** The cashier records settlement only after all non-cancelled items are served and at least one was served. Payment method denotes **employee attestation of money received outside the app**, not an actual bank transaction.
+
+**Why:** Prevents quiet closure while a plate is still in the kitchen, and keeps a small MVP understandable.
+
+**Alternative rejected:** Any-time close regardless of service state; mock online payment gateway.
+
+**Cost / trigger:** This is **too restrictive** for customers paying early, takeaway and unusual service recovery. Next iteration should support explicit manager-authorized early payment while kitchen tasks continue independently. No real payment, refund or reconciliation exists.
+
+## D-07 · Manager-only cancellation and fully-cancelled release
+**Choice:** Waiters may cancel queued items with a reason; managers may exceptionally cancel preparing/ready-but-not-served items. If **every item** is cancelled, only a manager may close the session with a reason and **without payment fields**.
+
+**Why:** A stockout or full cancellation should not leave a permanent occupied table or force fictitious payment data.
+
+**Alternative rejected:** Marking cancelled items as served or creating a fake zero-toman payment.
+
+**Cost / revisit:** An additional audited exception path. Served-item refunds and partial financial adjustments are not included.
+
+## D-08 · Integer toman with server-owned price snapshots
+**Choice:** Store money as validated integer **toman** and snapshot menu name/price when an item is committed. Recompute subtotal and discount on the server. A reviewed price that changed before order submission triggers a conflict rather than silent acceptance.
+
+**Why:** Different Iranian displays use rial/toman inconsistently. Silent conversion or recomputing historical tickets from new menu prices can damage trust.
+
+**Alternative rejected:** Floating-point client totals, silent rial conversions or calculating an old bill using current catalog prices.
+
+**Cost / revisit:** Fiscal accounting and regulatory invoice rules need a separate deliberate design; none are claimed.
+
+## D-09 · Persian-first task UI rather than generic translated administration
+**Choice:** RTL, Vazirmatn, Persian calendar/Tehran time, Persian/Arabic keyboard normalization, item-level instructions, and mobile steps **tables → menu → draft**, with a visible summary and draft-loss confirmation.
+
+**Why:** A waiter working quickly on a phone has different needs from an English desktop back-office user. Distinct notes for two nominally identical drinks must not be merged.
+
+**Alternative rejected:** English-first admin template, giant phone scroll, hidden cart, exact-character-only search.
+
+**Cost / revisit:** More input boundary tests and responsive states; stored drafts remain in browser memory and can be lost on crash. Real iOS/Android assistive-technology testing is outstanding.
+
+## D-10 · Five-second polling instead of WebSocket/SSE **[revisit]**
+**Choice:** Refresh the shift snapshot periodically; show connection errors and only declare success after the server acknowledges a write. No offline order queue.
+
+**Why:** It minimizes reconnection and synchronization work within a tightly scoped assessment.
+
+**Alternative rejected:** An immediate multi-node WebSocket event infrastructure.
+
+**Cost / trigger:** Up to roughly five seconds of visibility delay and unnecessary snapshot traffic; not good enough for a very busy kitchen or thousands of active branches. Move to narrow push events, observable reconnect and resynchronization when volume justifies it.
+
+## D-11 · Plain Node.js + PostgreSQL + vanilla browser UI
+**Choice:** Node.js 22 HTTP service, PostgreSQL 16 with migrations and a restricted runtime role, and lightweight HTML/CSS/JavaScript UI without a frontend framework or build pipeline. Local startup uses Docker Compose.
+
+**Why:** Minimize framework/deployment overhead while prioritizing the data invariants and complete workflow. This is a deliberate short-horizon choice, not a claim that vanilla JS always scales better.
+
+**Alternative rejected:** A large Next.js monorepo or adopting a full existing POS and reshaping the entire workflow.
+
+**Cost / trigger:** Rendering/state management grows harder with additional teams and modules. Extract components or adopt a framework when changes justify the migration. Use versioned, reversible migrations before production schema evolution.
+
+## D-12 · Narrow AI-assisted order *proposal*, never autonomous order posting
+**Choice:** The later text-intake workflow is bound to authenticated tenant/table/session and source revision. It produces editable menu-item proposals with quantities, per-item notes, cited source phrases and unresolved phrases. Staff explicitly **add approved lines to a draft**; a separate normal order action performs the transactional write. An unavailable provider leaves a clearly labeled **rule-based, non-AI matcher** plus manual entry.
+
+**Why:** A phrase such as «دو لاته، یکی کم‌شیر» is not safe to turn into two indistinguishable lines. The model must not invent menu IDs, prices, availability or transaction authority.
+
+**Alternative rejected:** Free-form chatbot directly modifying orders; pretending deterministic search is model inference; silently discarding uncertain phrases.
+
+**Cost / trigger:** Human review is sometimes slower; actual model accuracy, cost, latency, permitted Iranian service access and privacy have not been established. AI is optional, rate-limited and disableable. See AI_USAGE.md and docs/AI_ORDER_TECHNICAL_DESIGN.md.
+
+## D-13 · Demo infrastructure, not production certification
+**Choice:** Docker Compose for reproducible local setup, a Render Free web demo and a separate Neon Postgres environment for assessment, with demo-only fictional accounts and private hosted credentials.
+
+**Why:** A reviewer needs source, an understandable local run, and a browsable demonstration without paid infrastructure.
+
+**Alternative rejected:** Requiring purchase of a production server or embedding a public shared demo password in the Git repository.
+
+**Cost / trigger:** Free hosting may sleep, external networks may not reach the site without VPN, and the public demo requires a real hosted-login/complete-flow check. A healthy /api/health does **not** certify the whole workflow.
+
+## D-14 · Verification through invariants, negative tests and explicit evidence limits
+**Choice:** Exercise roles, cross-tenant attempts, idempotency, concurrency, item state guards, Persian input, manual fallback and seeded order-to-settlement flow in automated tests. Keep a personally narrated 5–10 minute video separate from CI browser evidence.
+
+**Why:** A polished interface cannot compensate for a lost round, an unauthorized payment or a cross-restaurant leak.
+
+**Alternative rejected:** Screenshots, generated test text or a green health endpoint as sufficient proof.
+
+**Cost / revisit:** Real-device, accessibility, security, stress and provider-backed evaluation remain outstanding. The latest CI result must be checked rather than assumed.
+
+## Decisions intentionally deferred
+
+The first two decisions to reverse with real usage data are **D-06 (early payment exceptions)** and **D-10 (polling)**. After that, prioritize branch-scoped permissions, durable draft recovery, production backup/monitoring, kitchen alerts, inventory availability, hardware integration and payment/fiscal requirements validated against actual Iranian operations.
+
+## Provenance and effort
+
+The original scope was established first; code correctness, UX and editable order proposals were refined later in the repository's chronological history. **Later in calendar time does not mean the candidate worked continuously or necessarily exceeded the six-hour active-work budget.** The candidate reports **roughly six hours of hands-on productive effort total, spread over multiple sessions**; this estimate is self-reported, not inferred from timestamps. ChatGPT/GPT-6 substantially assisted with research, design, implementation, testing and documentation; specific limitations and corrections are disclosed in [AI_USAGE.md](AI_USAGE.md).
