@@ -54,19 +54,20 @@ export function parseOrderRules(text,menu){
    else if(after&&qualifier.test(after)){note=after;}
    else if(after){unresolved.push(issue(after,'extra_text'));}
    if(specificCount){
+    if(/\s(?:اون یکی|یکی|یکیش|دوتاش)\s/u.test(note)){unresolved.push(issue(segment,'ambiguous_unit_note'));continue;}
     if(qty<=specificCount){unresolved.push(issue(segment,'ambiguous_unit_note'));continue;}
     items.push({menuItemId:item.id,quantity:specificCount,note,sourceText:segment});
     items.push({menuItemId:item.id,quantity:qty-specificCount,note:'',sourceText:segment});
    }else items.push({menuItemId:item.id,quantity:qty,note,sourceText:segment});
   }else {
    const m=key.match(notePrefixes);
-   const prev=items.at(-1);
+   const amount=/^(?:دوتاش|دو تاش)/u.test(key)?2:1;
+   const prev=[...items].reverse().find(x=>!x.note&&x.quantity>=amount);
    if(m&&prev){
-    const amount=/^(?:دوتاش|دو تاش)/u.test(key)?2:1;
-    if(prev.quantity<=amount){unresolved.push(issue(segment,'ambiguous_unit_note'));continue;}
-    const copy={...prev,quantity:amount,note:m[1],sourceText:segment};
-    prev.quantity-=amount;items.push(copy);
-   }else if(/^(?:دوتا|دو تا|یکی)\s+معمولی$/u.test(key) && items.length){ /* already represented by the unmodified remainder */ }
+    const note=m[1]==='معمولی'?'':m[1];
+    if(prev.quantity===amount){if(note)prev.note=note;prev.sourceText=segment;}
+    else {prev.quantity-=amount;items.push({...prev,quantity:amount,note,sourceText:segment});}
+   }else if(/^(?:دوتا|دو تا|یکی)\s+معمولی$/u.test(key)&&items.some(x=>!x.note)){ /* confirms default preparation */ }
    else unresolved.push(issue(segment,'unmatched',candidates(segment,menu)));
   }
  }
