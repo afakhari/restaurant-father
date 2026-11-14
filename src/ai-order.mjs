@@ -85,7 +85,13 @@ export function validateModelSuggestion(payload,menu,originalText){
  const lines=[],unresolved=[];
  for(const entry of payload.items){
   if(!entry||typeof entry!=='object'||Array.isArray(entry)){unresolved.push(issue('قلم نامعتبر','invalid_item'));continue;}
-  const witness=clean(entry.sourceText)||clean(entry.evidence)||'قلم پیشنهادشده';
+  const witness=clean(entry.sourceText)||clean(entry.evidence);
+  if(!witness||witness.length>200||!orderKey(originalText).includes(orderKey(witness))){
+   unresolved.push(issue(witness||'قلم بدون شاهد','unverified_evidence'));continue;
+  }
+  if(entry.quantity>1&&typeof entry.note==='string'&&entry.note.trim()&&/(?:یکی|یکیش|اون یکی|یکی‌ش|دوتاش|دو تاش)/u.test(orderKey(witness))){
+   unresolved.push(issue(witness,'ambiguous_unit_note',[entry.menuItemId]));continue;
+  }
   if(!valid.has(entry.menuItemId)){unresolved.push(issue(witness,'unknown_menu_item'));continue;}
   if(!Number.isInteger(entry.quantity)||entry.quantity<1||entry.quantity>20){unresolved.push(issue(witness,'invalid_quantity',[entry.menuItemId]));continue;}
   if(typeof entry.note!=='string'||entry.note.length>240){unresolved.push(issue(witness,'invalid_note',[entry.menuItemId]));continue;}
@@ -96,7 +102,24 @@ export function validateModelSuggestion(payload,menu,originalText){
   const t=clean(typeof part==='string'?part:part?.text);
   if(t)unresolved.push(issue(t,'unmatched',candidates(t,menu)));
  }
+ if(Array.isArray(payload.unresolved)&&payload.unresolved.length>40)unresolved.push(issue('پاسخ مدل شامل عبارات بررسی‌نشده بیشتری است','too_many_unresolved'));
  if(clean(payload.unmatched))unresolved.push(issue(payload.unmatched,'unmatched',candidates(payload.unmatched,menu)));
+ // A model may validly identify one menu ID while silently omitting other
+ // requested dishes. Every source clause must be represented by model evidence
+ // or an explicitly unresolved phrase before a proposal can be approved.
+ const evidence=[...payload.items.map(x=>clean(x?.sourceText)||clean(x?.evidence)),...unresolved.map(x=>x.text)]
+  .map(orderKey).filter(Boolean);
+ for(const segment of originalText.split(/[،,؛;\n]+|\s+و\s+/u).map(clean).filter(Boolean)){
+  const part=orderKey(segment);
+  if(!part)continue;
+  let remainder=part;
+  for(const proof of evidence){
+   if(proof.includes(part)){remainder='';break;}
+   if(remainder.includes(proof))remainder=remainder.replace(proof,' ');
+  }
+  remainder=remainder.replace(/\s+/g,'').trim();
+  if(remainder.length>=4)unresolved.push(issue(segment,'unaccounted_for'));
+ }
  if(!lines.length&&!unresolved.length)unresolved.push(issue(originalText,'unmatched'));
  return {items:lines,unresolved};
 }
