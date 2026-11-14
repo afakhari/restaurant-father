@@ -122,7 +122,7 @@ try {
   const noteValues=await page.locator('[data-ai-note]').evaluateAll(els=>els.map(x=>x.value));
   assert.equal(noteValues.filter(Boolean).length,1,'One note must not be applied to both drinks');
   await page.locator('[data-ai-menu="0"]').selectOption({label:'اسپرسو'});
-  assert.equal(await page.locator('[data-ai-menu="0"]').inputValue(),await page.locator('.menu-item').filter({hasText:'اسپرسو'}).locator('button.add').getAttribute('data-id'));
+  assert.equal(await page.locator('[data-ai-menu="0"]').inputValue(),await page.locator('button.add[aria-label="افزودن اسپرسو"]').getAttribute('data-id'));
   await page.locator('[data-ai-qty="0"]').fill('۲');
   await page.locator('[data-ai-qty="0"]').press('Tab');
   assert.match(await page.locator('[data-ai-price="0"]').innerText(),/تومان/,'Price preview updates with quantity');
