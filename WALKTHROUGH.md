@@ -14,7 +14,7 @@
 | 6:05–6:45 | Optional AI parse with real provider (only if configured) | Human preview, bounded menu IDs, manual fallback; otherwise acknowledge provider not configured |
 | 6:45–7:45 | `DECISIONS.md`, `HANDOVER.md`, `AI_USAGE.md` | What went wrong, which two decisions we'd change, where 1k/100k scale fails, full AI assistance disclosure |
 
-Do not claim deployed HTTPS, real AI output, passing integration tests or running video unless independently confirmed. The operator should capture screen and voice from a real running instance, and put a verifiable URL in the final submission.
+A public Render HTTPS demo URL is documented, but do not claim completed hosted-login acceptance, real provider output, or a candidate-narrated video until each has been independently verified. Link the relevant CI results rather than assuming a green status. The operator should capture screen and voice from a real running instance, and put a verifiable URL in the final submission.
 
 ## Browser evidence as a visual aid, not candidate narration
 
