@@ -100,3 +100,12 @@ Each decision documents **decision / why / alternative / accepted trade-off**, r
 - **Why:** The server may commit an order while its network response is lost. A subsequent edited retry must not report success for an older, different order.
 - **Alternative:** Deduplicate solely by actor-provided idempotency key, regardless of content.
 - **Trade-off:** One small indexed lookup of original order lines on replay; bounded to twelve lines per round.
+
+
+## D-15 — Editable natural-language order proposals with truthful non-AI fallback (later enhancement)
+
+- **Decision:** Suggestions belong to a verified restaurant/table/session and a particular source-text revision. Unmatched and invalid entries remain visible. Staff edit menu items, quantities and per-unit notes, then explicitly add to the draft; final submission is a separate server transaction. A limited deterministic fallback is labeled non-AI.
+- **Why:** Ambiguous Persian restaurant utterances, different preparation requirements and in-flight table switching make auto-submission unsafe. Price snapshot expectations reject silent price changes between review and kitchen submission.
+- **Alternative:** Unvalidated LLM JSON inserts, auto-posted orders and paid provider dependency for every waiter action.
+- **Trade-off:** Ambiguity still needs human decisions, and a shared distributed limiter/cost budget and legally available provider are needed before scaling. This work was requested after the original six-hour MVP.
+
