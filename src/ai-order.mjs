@@ -46,6 +46,9 @@ export function parseOrderRules(text,menu){
    if(matched.length>1){unresolved.push(issue(segment,'multiple_menu_items',matched.map(m=>m.id)));continue;}
    if(key.split(nameKey).length>2){unresolved.push(issue(segment,'repeated_mention',[item.id]));continue;}
    const qty=numberBefore(segment,nameKey);
+   const preceding=key.slice(0,key.indexOf(nameKey)).trim().replace(/^(?:لطفا|لطفاً)\s+/u,'').replace(/(?:عدد|تا)\s*$/u,'').trim();
+   const beforeWords=preceding?preceding.split(/\s+/u):[];
+   if(beforeWords.length>1||(beforeWords.length===1&&!words.has(beforeWords[0])&&!/^[0-9]+$/.test(beforeWords[0])))unresolved.push(issue(preceding,'extra_text'));
    if(!Number.isInteger(qty)||qty<1||qty>20){unresolved.push(issue(segment,'invalid_quantity'));continue;}
    const after=key.slice(key.indexOf(nameKey)+nameKey.length).trim();
    let note='',specificCount=0;
@@ -63,7 +66,8 @@ export function parseOrderRules(text,menu){
    const m=key.match(notePrefixes);
    const amount=/^(?:دوتاش|دو تاش)/u.test(key)?2:1;
    const prev=[...items].reverse().find(x=>!x.note&&x.quantity>=amount);
-   if(m&&prev){
+   const multipleDishes=new Set(items.map(x=>x.menuItemId)).size>1;
+   if(m&&prev&&!multipleDishes){
     const note=m[1]==='معمولی'?'':m[1];
     if(prev.quantity===amount){if(note)prev.note=note;prev.sourceText=segment;}
     else {prev.quantity-=amount;items.push({...prev,quantity:amount,note,sourceText:segment});}
